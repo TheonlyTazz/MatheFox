@@ -8,11 +8,17 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; background: #fff7ed; }
+html { background: #fff7ed; }
+body { margin: 0; min-width: 320px; background: #fff7ed; -webkit-tap-highlight-color: transparent; }
 button, input { font: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; touch-action: manipulation; }
+button:focus-visible, input:focus-visible { outline: 3px solid #fb923c; outline-offset: 3px; }
 .fox-gradient { background: linear-gradient(135deg, #ff7a59, #f97316); }
 .paper-grid {
   background-image: linear-gradient(#fed7aa 1px, transparent 1px), linear-gradient(90deg, #fed7aa 1px, transparent 1px);
   background-size: 24px 24px;
+}
+
+@media (max-width: 639px) {
+  body { padding-bottom: env(safe-area-inset-bottom); }
 }
