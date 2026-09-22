@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { CalendarCheck, CalendarClock, ChevronRight, Flame, Star, Target } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { CalendarCheck, CalendarClock, ChevronRight, Flame, Star, Target, Trophy } from 'lucide-vue-next'
+import CertificateModal from '../components/CertificateModal.vue'
 import { topics } from '../data/topics'
 import { testRegistry } from '../data/tests'
 import { useProgressStore } from '../stores/progress'
 import { useDailyChallengeStore } from '../stores/dailyChallenge'
+import type { CertificateData } from '../types/certificate'
 import type { TopicKey } from '../types/math'
 
 const emit = defineEmits<{ practice: [topic?: TopicKey]; exam: []; daily: [] }>()
@@ -13,6 +15,19 @@ const daily = useDailyChallengeStore()
 daily.syncToToday()
 const exam = testRegistry[0]
 const daysUntil = computed(() => Math.max(0, Math.ceil((new Date(exam.date).getTime() - Date.now()) / 86400000)))
+const certificate = ref<CertificateData>()
+const certificateOpen = ref(false)
+const openBadgeCertificate = (badge: string): void => {
+  certificate.value = {
+    awardTitle: 'MatheFox-Abzeichen',
+    result: { label: 'Abzeichen', value: badge },
+    issuedAt: new Date(),
+  }
+  certificateOpen.value = true
+}
+const closeCertificate = (): void => {
+  certificateOpen.value = false
+}
 </script>
 
 <template>
@@ -29,8 +44,10 @@ const daysUntil = computed(() => Math.max(0, Math.ceil((new Date(exam.date).getT
     <section v-if="progress.badges.length" class="mt-8 rounded-3xl border border-amber-100 bg-amber-50 p-5">
       <div class="flex items-center gap-2"><Trophy class="text-amber-600" :size="21" /><h2 class="font-black text-amber-900">Deine Abzeichen</h2></div>
       <div class="mt-3 flex flex-wrap gap-2">
-        <span v-for="badge in progress.badges" :key="badge" class="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-amber-800 shadow-sm">{{ badge }}</span>
+        <button v-for="badge in progress.badges" :key="badge" type="button" class="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-amber-800 shadow-sm hover:bg-amber-100" @click="openBadgeCertificate(badge)">{{ badge }}</button>
       </div>
+      <button type="button" class="mt-4 min-h-11 rounded-xl bg-amber-500 px-4 py-2 font-bold text-white hover:bg-amber-600" @click="openBadgeCertificate(progress.badges[0])">Abzeichen ansehen</button>
     </section>
+    <CertificateModal v-if="certificate" :open="certificateOpen" :certificate="certificate" @close="closeCertificate" />
   </main>
 </template>

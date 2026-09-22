@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ArrowLeft, CheckCircle2, ChevronRight, LockKeyhole, Trophy } from 'lucide-vue-next'
+import CertificateModal from '../components/CertificateModal.vue'
 import ExerciseCard from '../components/ExerciseCard.vue'
 import { useDailyChallengeStore } from '../stores/dailyChallenge'
+import type { CertificateData } from '../types/certificate'
 
 const emit = defineEmits<{ home: [] }>()
 const daily = useDailyChallengeStore()
@@ -13,17 +15,41 @@ const active = ref(firstUnanswered >= 0 ? firstUnanswered : 0)
 const current = computed(() => daily.challenge.questions[active.value])
 const currentResult = computed(() => current.value ? daily.results[current.value.id] : undefined)
 const score = computed(() => daily.challenge.questions.filter((question) => daily.results[question.id]?.correct).length)
+const certificate = ref<CertificateData>()
+const certificateOpen = ref(false)
+const captureCertificate = (): void => {
+  if (!daily.completion || certificate.value) return
+  certificate.value = {
+    awardTitle: 'Tages-Challenge',
+    result: { label: 'Ergebnis', value: `${score.value} von ${daily.challenge.questions.length} richtig` },
+    issuedAt: new Date(),
+  }
+}
+captureCertificate()
 let rolloverTimer: ReturnType<typeof setInterval> | undefined
 const syncDate = (): void => {
   const previousDate = daily.currentDateKey
   daily.syncToToday()
-  if (daily.currentDateKey !== previousDate) active.value = 0
+  if (daily.currentDateKey !== previousDate) {
+    active.value = 0
+    certificate.value = undefined
+    certificateOpen.value = false
+    captureCertificate()
+  }
 }
 const solved = (correct: boolean, _credit: boolean, answer: string): void => {
   if (!current.value) throw new Error('Die Tages-Challenge hat keine aktuelle Aufgabe.')
   daily.submit(current.value.id, answer)
+  captureCertificate()
   if (!correct) return
   if (active.value < daily.challenge.questions.length - 1) active.value += 1
+}
+const openCertificate = (): void => {
+  if (!certificate.value) throw new Error('Für die Tages-Challenge ist noch kein Zertifikat verfügbar.')
+  certificateOpen.value = true
+}
+const closeCertificate = (): void => {
+  certificateOpen.value = false
 }
 onMounted(() => {
   rolloverTimer = setInterval(syncDate, 30_000)
@@ -57,7 +83,9 @@ onUnmounted(() => {
       <p class="mt-2 text-stone-500">Du hast {{ score }} von {{ daily.challenge.questions.length }} Aufgaben richtig gelöst.</p>
       <div class="mx-auto mt-6 max-w-xs rounded-2xl bg-amber-50 p-5"><strong class="text-4xl text-amber-600">{{ Math.round((score / daily.challenge.questions.length) * 100) }}%</strong><p class="mt-1 text-sm text-amber-800">Dein Tages-Ergebnis</p></div>
       <p class="mt-5 flex items-center justify-center gap-2 font-bold text-emerald-700"><CheckCircle2 :size="20" /> Für heute erledigt</p>
-      <button class="mt-6 flex mx-auto items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 font-bold text-white" @click="emit('home')">Zur Startseite</button>
+      <button type="button" class="mt-6 flex mx-auto min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-5 py-3 font-bold text-white hover:bg-amber-600" @click="openCertificate">Zertifikat ansehen</button>
+      <button class="mt-3 flex mx-auto items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 font-bold text-white" @click="emit('home')">Zur Startseite</button>
     </div>
+    <CertificateModal v-if="certificate" :open="certificateOpen" :certificate="certificate" @close="closeCertificate" />
   </main>
 </template>
