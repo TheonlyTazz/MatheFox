@@ -2,12 +2,13 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Clock, RotateCcw, Trophy } from 'lucide-vue-next'
 import ExerciseCard from '../components/ExerciseCard.vue'
-import { exercises } from '../data/exercises'
+import { generateMixedExamSet } from '../data/generator'
 import { testRegistry } from '../data/tests'
 import { useProgressStore } from '../stores/progress'
 
 const emit = defineEmits<{ home: [] }>()
 const test = testRegistry[0]
+if (!test) throw new Error('Es ist keine Prüfung registriert.')
 const progress = useProgressStore()
 const active = ref(0)
 const answers = ref<Record<string, boolean>>({})
@@ -15,11 +16,7 @@ const awardedExerciseIds = new Set<string>()
 const seconds = ref(test.durationMinutes * 60)
 const finished = ref(false)
 let timer: number | undefined
-const examExercises = test.exerciseIds.map((id) => {
-  const exercise = exercises.find((item) => item.id === id)
-  if (!exercise) throw new Error(`Test "${test.id}" references missing exercise "${id}".`)
-  return exercise
-})
+const examExercises = generateMixedExamSet(`${test.id}-${Date.now()}-${Math.random()}`, test.grade, test.exerciseIds.length)
 const current = computed(() => examExercises[active.value])
 const timeLabel = computed(() => `${String(Math.floor(seconds.value / 60)).padStart(2, '0')}:${String(seconds.value % 60).padStart(2, '0')}`)
 const score = computed(() => Object.values(answers.value).filter(Boolean).length)
