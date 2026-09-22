@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Flame, Home, PencilLine, Trophy } from 'lucide-vue-next'
+import { CalendarCheck, Flame, Home, PencilLine, Trophy } from 'lucide-vue-next'
 
-defineProps<{ active: 'home' | 'practice' | 'exam' }>()
-const emit = defineEmits<{ navigate: [view: 'home' | 'practice' | 'exam'] }>()
+defineProps<{ active: 'home' | 'practice' | 'exam' | 'daily' }>()
+const emit = defineEmits<{ navigate: [view: 'home' | 'practice' | 'exam' | 'daily'] }>()
 </script>
 
 <template>
@@ -15,6 +15,7 @@ const emit = defineEmits<{ navigate: [view: 'home' | 'practice' | 'exam'] }>()
       <nav class="flex items-center gap-1" aria-label="Hauptnavigation">
         <button aria-label="Startseite" :class="active === 'home' ? 'bg-orange-100 text-orange-700' : 'text-stone-500'" class="flex min-h-11 min-w-11 flex-col items-center justify-center rounded-xl px-2 text-[11px] font-bold sm:flex-row sm:gap-1 sm:px-3 sm:text-sm" @click="emit('navigate', 'home')"><Home :size="18" /><span>Start</span></button>
         <button aria-label="Üben" :class="active === 'practice' ? 'bg-orange-100 text-orange-700' : 'text-stone-500'" class="flex min-h-11 min-w-11 flex-col items-center justify-center rounded-xl px-2 text-[11px] font-bold sm:flex-row sm:gap-1 sm:px-3 sm:text-sm" @click="emit('navigate', 'practice')"><PencilLine :size="18" /><span>Üben</span></button>
+        <button aria-label="Tages-Challenge" :class="active === 'daily' ? 'bg-orange-100 text-orange-700' : 'text-stone-500'" class="flex min-h-11 min-w-11 flex-col items-center justify-center rounded-xl px-2 text-[11px] font-bold sm:flex-row sm:gap-1 sm:px-3 sm:text-sm" @click="emit('navigate', 'daily')"><CalendarCheck :size="18" /><span>Heute</span></button>
         <button aria-label="Mathearbeit" :class="active === 'exam' ? 'bg-orange-100 text-orange-700' : 'text-stone-500'" class="flex min-h-11 min-w-11 flex-col items-center justify-center rounded-xl px-2 text-[11px] font-bold sm:flex-row sm:gap-1 sm:px-3 sm:text-sm" @click="emit('navigate', 'exam')"><Trophy :size="18" /><span>Test</span></button>
       </nav>
       <div class="hidden items-center gap-1 rounded-full bg-rose-50 px-3 py-2 text-sm font-bold text-rose-600 sm:flex"><Flame :size="17" /> Streak</div>

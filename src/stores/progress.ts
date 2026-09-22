@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import confetti from 'canvas-confetti'
 import { storage } from '../services/storage'
 import { playBeep } from '../services/audio'
+import { getLocalDateKey } from '../data/dailyChallenge'
 import type { TopicKey } from '../types/math'
 
 interface SavedProgress {
@@ -53,10 +54,10 @@ export const useProgressStore = defineStore('progress', () => {
 
   const persist = (): void => storage.set('mathefox-progress', { xp: xp.value, streak: streak.value, completed: completed.value, badges: badges.value, lastPlayed: lastPlayed.value })
   const award = (topic: TopicKey, points: number): void => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = getLocalDateKey(new Date())
     if (lastPlayed.value !== today) {
-      const previousDay = lastPlayed.value ? new Date(`${lastPlayed.value}T00:00:00Z`) : undefined
-      const currentDay = new Date(`${today}T00:00:00Z`)
+      const previousDay = lastPlayed.value ? new Date(`${lastPlayed.value}T00:00:00`) : undefined
+      const currentDay = new Date(`${today}T00:00:00`)
       const daysSinceLastPlay = previousDay ? Math.round((currentDay.getTime() - previousDay.getTime()) / 86400000) : undefined
       streak.value = daysSinceLastPlay === 1 ? Math.min(streak.value + 1, 7) : 1
     }

@@ -3,10 +3,10 @@ import { Check, HelpCircle, RotateCcw, Sparkles } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import type { Exercise } from '../types/math'
 
-const props = defineProps<{ exercise: Exercise; compact?: boolean }>()
-const emit = defineEmits<{ solved: [correct: boolean, credit: boolean] }>()
-const answer = ref('')
-const submitted = ref(false)
+const props = defineProps<{ exercise: Exercise; compact?: boolean; singleAttempt?: boolean; initialAnswer?: string; initialSubmitted?: boolean }>()
+const emit = defineEmits<{ solved: [correct: boolean, credit: boolean, answer: string] }>()
+const answer = ref(props.initialAnswer ?? '')
+const submitted = ref(props.initialSubmitted ?? false)
 const showHint = ref(false)
 const credited = ref(false)
 const isCorrect = computed(() => props.exercise.validate(answer.value))
@@ -14,9 +14,9 @@ const submit = (): void => {
   submitted.value = true
   if (isCorrect.value && !credited.value) {
     credited.value = true
-    emit('solved', true, true)
+    emit('solved', true, true, answer.value)
   } else {
-    emit('solved', isCorrect.value, false)
+    emit('solved', isCorrect.value, false, answer.value)
   }
 }
 const retry = (): void => { answer.value = ''; submitted.value = false; showHint.value = false }
@@ -32,7 +32,7 @@ const retry = (): void => { answer.value = ''; submitted.value = false; showHint
     <div class="mt-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:flex">
       <button v-if="!submitted" :disabled="!answer" class="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-orange-600" @click="submit"><Check :size="18" /> Prüfen</button>
       <button v-if="!submitted" class="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-50 px-4 py-2 font-bold text-violet-700 hover:bg-violet-100" @click="showHint = !showHint"><HelpCircle :size="18" /> Tipp</button>
-      <button v-if="submitted" class="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-stone-100 px-4 py-2 font-bold text-stone-700 hover:bg-stone-200" @click="retry"><RotateCcw :size="18" /> Nochmal</button>
+      <button v-if="submitted && !props.singleAttempt" class="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-stone-100 px-4 py-2 font-bold text-stone-700 hover:bg-stone-200" @click="retry"><RotateCcw :size="18" /> Nochmal</button>
     </div>
     <p v-if="showHint && !submitted" class="mt-3 rounded-2xl bg-violet-50 p-3 text-sm text-violet-800"><Sparkles class="mr-1 inline" :size="16" />{{ exercise.hint }}</p>
     <div v-if="submitted" :class="isCorrect ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'" class="mt-4 rounded-2xl p-4">
