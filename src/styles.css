@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+:root {
+  font-family: "Nunito", "Trebuchet MS", system-ui, sans-serif;
+  color: #3b2f2f;
+  background: #fff7ed;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: #fff7ed; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+.fox-gradient { background: linear-gradient(135deg, #ff7a59, #f97316); }
+.paper-grid {
+  background-image: linear-gradient(#fed7aa 1px, transparent 1px), linear-gradient(90deg, #fed7aa 1px, transparent 1px);
+  background-size: 24px 24px;
+}
