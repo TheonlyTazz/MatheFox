@@ -57,8 +57,8 @@ const handleDialogKeydown = (event: KeyboardEvent): void => {
 </script>
 
 <template>
-  <div v-if="open" class="fixed inset-0 z-30 overflow-y-auto bg-stone-900/40 p-4" role="presentation" @click.self="close">
-    <div class="mx-auto flex min-h-full max-w-2xl items-center justify-center py-6">
+  <div v-if="open" class="fixed inset-0 z-30 overflow-y-auto bg-stone-900/40 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))] md:p-6 md:pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:pt-[calc(1.5rem+env(safe-area-inset-top))]" role="presentation" @click.self="close">
+    <div class="mx-auto flex min-h-full max-w-2xl items-center justify-center py-6 md:py-8">
       <div ref="dialog" aria-labelledby="certificate-modal-title" aria-modal="true" class="relative w-full" role="dialog" tabindex="-1" @keydown="handleDialogKeydown">
         <h2 id="certificate-modal-title" class="sr-only">MatheFox-Zertifikat</h2>
         <button ref="closeButton" aria-label="Zertifikat schliessen" class="absolute right-3 top-3 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white/90 text-stone-600 shadow-sm hover:bg-white" type="button" @click="close"><X :size="20" /></button>

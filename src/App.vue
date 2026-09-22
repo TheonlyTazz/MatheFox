@@ -19,6 +19,6 @@ const goPractice = (topic?: TopicKey): void => { selectedTopic.value = topic; vi
     <PracticeView v-else-if="view === 'practice'" :initial-topic="selectedTopic" />
     <ExamView v-else-if="view === 'exam'" @home="view = 'home'" />
     <DailyChallengeView v-else @home="view = 'home'" />
-    <footer class="mx-auto max-w-6xl px-4 pb-8 pt-4 text-center text-xs text-stone-400">MatheFox hilft dir beim Üben. Deine Fortschritte bleiben auf diesem Gerät.</footer>
+    <footer class="mx-auto max-w-6xl px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-4 text-center text-xs text-stone-400 md:pt-6">MatheFox hilft dir beim Üben. Deine Fortschritte bleiben auf diesem Gerät.</footer>
   </div>
 </template>

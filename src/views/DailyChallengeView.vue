@@ -60,9 +60,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="mx-auto max-w-4xl px-4 py-6 sm:py-10">
-    <div v-if="!daily.completion && current" class="rounded-[2rem] bg-white p-5 shadow-sm sm:p-8">
-      <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+  <main class="mx-auto max-w-4xl px-4 py-6 sm:py-10 md:px-6 md:py-12">
+    <div v-if="!daily.completion && current" class="rounded-[2rem] bg-white p-5 shadow-sm sm:p-8 md:p-10">
+      <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between md:mb-8 md:gap-8">
         <div>
           <button class="mb-3 flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 font-bold text-stone-500 hover:bg-stone-100" @click="emit('home')"><ArrowLeft :size="18" /> Zur Startseite</button>
           <p class="font-bold text-orange-600">Tages-Challenge · {{ active + 1 }}/{{ daily.challenge.questions.length }}</p>
@@ -72,12 +72,12 @@ onUnmounted(() => {
         <div class="flex items-center gap-2 rounded-xl bg-orange-50 px-3 py-2 font-black text-orange-700"><LockKeyhole :size="18" /> Ein Versuch</div>
       </div>
       <ExerciseCard :key="current.id" :exercise="current" :initial-answer="currentResult?.input" :initial-submitted="Boolean(currentResult)" single-attempt @solved="solved" />
-      <div class="mt-5 flex justify-between gap-2">
+      <div class="mt-5 flex justify-between gap-2 md:mt-7">
         <button :disabled="active === 0" class="min-h-11 rounded-xl px-4 py-2 font-bold text-stone-500 hover:bg-stone-100 disabled:opacity-40" @click="active = Math.max(0, active - 1)">Zurück</button>
         <button v-if="answered(current.id) && active < daily.challenge.questions.length - 1" class="flex min-h-11 items-center gap-2 rounded-xl bg-orange-500 px-5 py-2 font-bold text-white hover:bg-orange-600" @click="active++">Nächste <ChevronRight :size="18" /></button>
       </div>
     </div>
-    <div v-else class="rounded-[2rem] bg-white p-8 text-center shadow-sm">
+    <div v-else class="rounded-[2rem] bg-white p-8 text-center shadow-sm md:p-10">
       <Trophy class="mx-auto text-amber-500" :size="58" />
       <h1 class="mt-4 text-3xl font-black text-stone-800">Tages-Challenge geschafft!</h1>
       <p class="mt-2 text-stone-500">Du hast {{ score }} von {{ daily.challenge.questions.length }} Aufgaben richtig gelöst.</p>
