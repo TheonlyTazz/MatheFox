@@ -10,9 +10,12 @@ interface SavedProgress {
   xp: number
   streak: number
   completed: Record<TopicKey, number>
+  completedTopics?: Record<TopicKey, boolean>
   badges: string[]
   lastPlayed: string
 }
+
+type TopicCompletionState = Record<TopicKey, boolean>
 
 const blank: SavedProgress = {
   xp: 0, streak: 0, completed: {
@@ -24,6 +27,15 @@ const blank: SavedProgress = {
     grundrechenarten: 0,
     geometrie: 0,
     sachaufgaben: 0,
+  }, completedTopics: {
+    klammern: false,
+    schriftlich_komma: false,
+    zeit: false,
+    preise: false,
+    fachbegriffe: false,
+    grundrechenarten: false,
+    geometrie: false,
+    sachaufgaben: false,
   }, badges: [], lastPlayed: '',
 }
 
@@ -34,9 +46,15 @@ const isSavedProgress = (value: unknown): value is SavedProgress => {
   if (completed === null || typeof completed !== 'object') return false
   const completedRecord = completed as Record<string, unknown>
   const topicKeys: TopicKey[] = ['klammern', 'schriftlich_komma', 'zeit', 'preise', 'fachbegriffe', 'grundrechenarten', 'geometrie', 'sachaufgaben']
+  const completedTopics = candidate.completedTopics
+  const hasValidTopicCompletions = completedTopics === undefined
+    || (completedTopics !== null
+      && typeof completedTopics === 'object'
+      && topicKeys.every((topic) => typeof (completedTopics as Record<string, unknown>)[topic] === 'boolean'))
   return typeof candidate.xp === 'number'
     && typeof candidate.streak === 'number'
     && topicKeys.every((topic) => typeof completedRecord[topic] === 'number')
+    && hasValidTopicCompletions
     && Array.isArray(candidate.badges)
     && candidate.badges.every((badge) => typeof badge === 'string')
     && typeof candidate.lastPlayed === 'string'
@@ -47,12 +65,27 @@ export const useProgressStore = defineStore('progress', () => {
   const xp = ref(saved.xp)
   const streak = ref(saved.streak)
   const completed = ref<Record<TopicKey, number>>(saved.completed)
+  const completedTopics = ref<TopicCompletionState>(saved.completedTopics ?? blank.completedTopics ?? {
+    klammern: false,
+    schriftlich_komma: false,
+    zeit: false,
+    preise: false,
+    fachbegriffe: false,
+    grundrechenarten: false,
+    geometrie: false,
+    sachaufgaben: false,
+  })
   const badges = ref<string[]>(saved.badges)
   const lastPlayed = ref(saved.lastPlayed)
   const level = computed(() => Math.floor(xp.value / 100) + 1)
   const levelProgress = computed(() => xp.value % 100)
 
-  const persist = (): void => storage.set('mathefox-progress', { xp: xp.value, streak: streak.value, completed: completed.value, badges: badges.value, lastPlayed: lastPlayed.value })
+  const persist = (): void => storage.set('mathefox-progress', { xp: xp.value, streak: streak.value, completed: completed.value, completedTopics: completedTopics.value, badges: badges.value, lastPlayed: lastPlayed.value })
+  const completeTopic = (topic: TopicKey): void => {
+    if (completedTopics.value[topic]) return
+    completedTopics.value[topic] = true
+    persist()
+  }
   const award = (topic: TopicKey, points: number): void => {
     const today = getLocalDateKey(new Date())
     if (lastPlayed.value !== today) {
@@ -73,5 +106,5 @@ export const useProgressStore = defineStore('progress', () => {
     if ((completed.value[topic] ?? 0) % 3 === 0 || streak.value >= 3) void confetti({ particleCount: 80, spread: 70, origin: { y: 0.65 } })
   }
 
-  return { xp, streak, completed, badges, level, levelProgress, award }
+  return { xp, streak, completed, completedTopics, badges, level, levelProgress, award, completeTopic }
 })
