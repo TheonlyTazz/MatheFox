@@ -4,38 +4,31 @@
 
 ### 🦊 Schlau rechnen, Spass haben!
 
-Eine mobile-first Lern-App für Mathearbeiten in der 4. und 5. Klasse.
+Eine mobile Lern-App für Mathematik in den Klassen 1 bis 4.
 
 [**Live-App öffnen**](https://theonlytazz.github.io/MatheFox/) · [**Quellcode ansehen**](https://github.com/TheonlyTazz/MatheFox)
 
 </div>
 
-MatheFox verwandelt das Üben für die Mathearbeit in kleine Quests: Kinder rechnen in kurzen Einheiten, bekommen sofort verständliches Feedback und sammeln dabei XP, Streaks und Abzeichen. Die App läuft vollständig statisch und offline-freundlich auf GitHub Pages — ohne Backend und ohne Konto.
+MatheFox verwandelt Matheübungen in kurze Missionen. Beim ersten Besuch wählen Kinder ihre Klasse, Themen, einen Spitznamen und einen Avatar. Aufgaben, Fortschritt und Einstellungen bleiben auf diesem Gerät. Die App läuft vollständig im Browser — ohne Backend und ohne Konto.
 
 ## Highlights
 
-- 📚 Übungsmodus mit dauerhaftem Fragenpool und unbegrenzten Wiederholungen
-- 📅 Tägliche Mathe-Challenge im Wordle-Stil mit 10 deterministisch generierten Aufgaben
-- 🔁 Jeden Tag neue Zahlen, Rechenwege und Aufgabenvarianten
-- 🧪 Prüfungs-Simulator mit 15 gemischten Aufgaben und Zeitlimit
-- 🧠 Schwerpunkte für die Mathearbeit am 29.09.2026:
-  Klammern, Kommazahlen, Uhrzeiten, Preise und Fachbegriffe
-- 🌱 Evergreen-Themen: Grundrechenarten, Geometrie und Sachaufgaben
-- 🏆 XP, Level, Lern-Streaks und Abzeichen wie „Zeit-Meisterin“ und „Klammer-Profi“
+- 📚 22 Schwerpunkte in vier getrennten Klassenkatalogen
+- 🎯 Gemischte Missionen nur aus den gewählten Themen sowie gezieltes Üben einzelner Themen
+- 🔁 Generierte Rechenaufgaben und strukturierte Aufgaben mit Tabellen, Zuordnungen, Uhr und Formen
+- ⚙️ Klassenstufe und aktive Themen jederzeit im Kopfbereich ändern
+- 🧪 Prüfungs-Simulator für die Mathearbeit vom 29.09.2026 in Klasse 4, wenn alle Themen aktiv sind
+- 🏆 XP, Lern-Streaks und Themen-Abzeichen
 - ✏️ Mobiler Schmierzettel mit Touch- und Maus-Unterstützung
 - 🔊 Kleine Web-Audio-Erfolge und Konfetti-Momente
 - 💾 Fortschritt wird lokal im Browser gespeichert
 
-## Tägliche Challenge
+## Übungen und Fortschritt
 
-Die Tages-Challenge erzeugt jeden Tag ein neues Set aus zehn Fragen. Das Datum dient als Seed für einen kleinen Zufallsgenerator. Dadurch gilt:
+Der Übungsmodus erzeugt neue Aufgaben aus den aktiven Themen der gewählten Klasse. Eine gemischte Mission enthält zehn Aufgaben; eine Themenrunde enthält sechs. Falsche Antworten können erneut versucht werden. Nach einer vollständig gelösten Themenrunde wird ein Abzeichen freigeschaltet.
 
-- Alle Kinder bekommen am selben Tag dieselben Aufgaben.
-- Am nächsten Tag entstehen neue Zahlen und Varianten.
-- Ein erneutes Öffnen am selben Tag setzt die Challenge nicht zurück.
-- Antworten werden lokal gespeichert und jede Aufgabe kann nur einmal abgegeben werden.
-
-Die Generierung ist komplett offline und benötigt keine API oder zentrale Datenbank.
+Das Profil mit Klasse, Themen, XP und Abzeichen wird automatisch im lokalen Browserspeicher gesichert. Für Klasse 4 bleibt die Probearbeit vom 29.09.2026 verfügbar.
 
 ## Lokal starten
 
@@ -73,15 +66,14 @@ Die App ist als kleine, erweiterbare Vue-Anwendung aufgebaut:
 
 ```text
 src/
-├── components/       Wiederverwendbare UI-Bausteine
+├── components/       Wizard, Kopfbereich, Übungs-Widgets und Schmierzettel
 ├── data/
-│   ├── tests/        Testmodule und Registry
-│   ├── exercises.ts  Statischer Übungspool
-│   └── dailyChallenge.ts
-├── services/         StorageAdapter und Audio-Feedback
-├── stores/           Pinia-Stores für Fortschritt und Tages-Challenge
-├── types/            Gemeinsame TypeScript-Typen
-└── views/            Dashboard, Üben, Challenge und Simulator
+│   ├── grades/       Getrennte Kataloge für Klassen 1 bis 4
+│   └── tests/        Bestehende Mathearbeit für Klasse 4
+├── services/         Audio-Feedback und Browser-Helfer
+├── stores/           Pinia-Profil und bestehende Prüfungsdaten
+├── types/            Typen für Kataloge und Aufgaben
+└── views/            Dashboard, Üben und Simulator
 ```
 
 ### Neue Testmodule hinzufügen
@@ -92,11 +84,11 @@ Testdaten liegen getrennt von der Oberfläche. Für eine neue Mathearbeit:
 2. Ein `MathTestModule` mit den passenden Übungen definieren.
 3. Das Modul in `src/data/tests/index.ts` registrieren.
 
-Die UI kann dadurch weitere Tests und Themen nutzen, ohne dass die Aufgabenlogik in den Views dupliziert werden muss.
+Neue Übungsthemen werden im Katalog der passenden Klasse unter `src/data/grades/` ergänzt. Die Oberfläche liest den Katalog über `getGradeCatalog()`.
 
 ### Speicherung
 
-Der `StorageAdapter` kapselt den lokalen Speicher. Er kann später durch einen Adapter für Supabase oder einen anderen Sync-Dienst ersetzt werden, ohne dass die Pinia-Stores oder die Oberfläche ihre Schnittstellen ändern müssen.
+Der Profil-Store speichert Änderungen automatisch in `localStorage`. Die Anwendung benötigt keinen externen Dienst.
 
 ## Technologie
 
@@ -104,4 +96,4 @@ Der `StorageAdapter` kapselt den lokalen Speicher. Er kann später durch einen A
 
 ## Hinweis
 
-MatheFox ist ein persönliches Lernprojekt für die Vorbereitung auf eine Mathearbeit. Die Inhalte sind für die Klassenstufen 4/5 gedacht und ersetzen keine individuelle Betreuung oder den Unterricht.
+MatheFox ist ein persönliches Lernprojekt für die Klassen 1 bis 4 und ersetzt keine individuelle Betreuung oder den Unterricht.

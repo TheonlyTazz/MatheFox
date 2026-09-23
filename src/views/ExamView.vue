@@ -5,13 +5,28 @@ import CertificateModal from '../components/CertificateModal.vue'
 import ExerciseCard from '../components/ExerciseCard.vue'
 import { generateMixedExamSet } from '../data/generator'
 import { testRegistry } from '../data/tests'
-import { useProgressStore } from '../stores/progress'
+import { useProfileStore } from '../stores/profile'
 import type { CertificateData } from '../types/certificate'
+import type { TopicKey } from '../types/math'
 
 const emit = defineEmits<{ home: [] }>()
 const test = testRegistry[0]
 if (!test) throw new Error('Es ist keine Prüfung registriert.')
-const progress = useProgressStore()
+const profile = useProfileStore()
+if (profile.currentGrade !== 4) throw new Error('Diese Mathearbeit ist nur für Klasse 4 verfügbar.')
+const catalogTopicIds: Record<TopicKey, string> = {
+  klammern: 'g4_klammern_punkt_strich',
+  schriftlich_komma: 'g4_schriftlich_komma',
+  zeit: 'g4_zeit_umrechnung',
+  preise: 'g4_preistabellen',
+  fachbegriffe: 'g4_fachbegriffe',
+  grundrechenarten: 'g4_schriftlich_mult_div',
+  geometrie: 'g4_geometrie_begruendung',
+  sachaufgaben: 'g4_sachrechnen_ungleichungen',
+}
+if (Object.values(catalogTopicIds).some((topicId) => !profile.activeTopicIds.includes(topicId))) {
+  throw new Error('Für die Mathearbeit müssen alle Themen der Klasse 4 ausgewählt sein.')
+}
 const active = ref(0)
 const answers = ref<Record<string, boolean>>({})
 const awardedExerciseIds = new Set<string>()
@@ -39,7 +54,7 @@ const solved = (correct: boolean, credit: boolean): void => {
   answers.value[current.value.id] = correct
   if (correct && credit && !awardedExerciseIds.has(current.value.id)) {
     awardedExerciseIds.add(current.value.id)
-    progress.award(current.value.topic, current.value.xp)
+    profile.award(catalogTopicIds[current.value.topic], current.value.xp)
   }
 }
 const openCertificate = (): void => {

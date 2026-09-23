@@ -1,63 +1,78 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { BookOpen, Pencil } from 'lucide-vue-next'
-import ExerciseCard from '../components/ExerciseCard.vue'
-import Scratchpad from '../components/Scratchpad.vue'
-import { generateRandomSession } from '../data/generator'
-import { topics, topicByKey } from '../data/topics'
-import { useProgressStore } from '../stores/progress'
-import type { Exercise, TopicKey } from '../types/math'
+import { BookOpen, CheckCircle2, RotateCcw } from 'lucide-vue-next'
+import CurriculumExerciseCard from '../components/CurriculumExerciseCard.vue'
+import { generateSession, getGradeCatalog } from '../data/grades'
+import { useProfileStore } from '../stores/profile'
+import type { Exercise } from '../types/curriculum'
 
-const props = defineProps<{ initialTopic?: TopicKey }>()
-const selected = ref<TopicKey>(props.initialTopic ?? 'klammern')
-const session = ref<Exercise[]>([])
+const props = defineProps<{ initialTopic?: string }>()
+const profile = useProfileStore()
+const catalog = getGradeCatalog(profile.currentGrade)
+const activeTopics = computed(() => catalog.topics.filter((topic) => profile.activeTopicIds.includes(topic.id)))
+if (activeTopics.value.length === 0) throw new Error('Wähle vor dem Üben mindestens ein Thema.')
+if (props.initialTopic && !profile.activeTopicIds.includes(props.initialTopic)) throw new Error(`Das Thema ${props.initialTopic} ist nicht aktiv.`)
+
+const selectedTopic = ref<string | undefined>(props.initialTopic)
+const questions = ref<Exercise[]>([])
 const index = ref(0)
-const submittedExerciseIds = ref<Set<string>>(new Set())
-const scratchpad = ref(false)
-const progress = useProgressStore()
+const creditedIds = ref<Set<string>>(new Set())
+const completed = ref(false)
 const current = computed(() => {
-  const exercise = session.value[index.value]
+  const exercise = questions.value[index.value]
   if (!exercise) throw new Error('Die Übungssitzung enthält keine aktuelle Aufgabe.')
   return exercise
 })
-const topic = computed(() => topicByKey(selected.value))
-const startSession = (topicKey: TopicKey): void => {
-  session.value = generateRandomSession({ topic: topicKey, count: 6, grade: 4 })
+const title = computed(() => {
+  if (!selectedTopic.value) return 'Deine Tagesmission'
+  const topic = activeTopics.value.find((item) => item.id === selectedTopic.value)
+  if (!topic) throw new Error(`Das ausgewählte Thema ${selectedTopic.value} ist nicht aktiv.`)
+  return topic.title
+})
+
+const startSession = (topicId?: string): void => {
+  if (topicId && !profile.activeTopicIds.includes(topicId)) throw new Error(`Das Thema ${topicId} ist nicht aktiv.`)
+  selectedTopic.value = topicId
+  questions.value = generateSession(profile.currentGrade, topicId ? [topicId] : profile.activeTopicIds, topicId ? 6 : 10, Date.now())
   index.value = 0
-  submittedExerciseIds.value = new Set()
+  creditedIds.value = new Set()
+  completed.value = false
 }
-const nextTopic = (topicKey: TopicKey): TopicKey => {
-  const topicIndex = topics.findIndex((item) => item.key === topicKey)
-  return topics[(topicIndex + 1) % topics.length].key
+
+const solved = (correct: boolean, credit: boolean): void => {
+  if (!correct || !credit || creditedIds.value.has(current.value.id)) return
+  creditedIds.value = new Set([...creditedIds.value, current.value.id])
+  profile.award(current.value.topicId, current.value.xpReward)
 }
+
 const nextExercise = (): void => {
-  if (index.value < session.value.length - 1) {
+  if (index.value < questions.value.length - 1) {
     index.value += 1
     return
   }
-  const followingTopic = nextTopic(selected.value)
-  selected.value = followingTopic
-  startSession(followingTopic)
+  completed.value = true
+  if (selectedTopic.value && creditedIds.value.size === questions.value.length) profile.completeTopic(selectedTopic.value)
 }
-const solved = (correct: boolean, credit: boolean): void => {
-  if (correct && credit) progress.award(current.value.topic, current.value.xp)
-  if (submittedExerciseIds.value.has(current.value.id)) return
-  submittedExerciseIds.value = new Set([...submittedExerciseIds.value, current.value.id])
-  if (submittedExerciseIds.value.size === session.value.length) {
-    progress.completeTopic(selected.value)
-    nextExercise()
-  }
-}
-startSession(selected.value)
+
+startSession(props.initialTopic)
 </script>
 
 <template>
   <main class="mx-auto max-w-6xl px-4 py-6 sm:py-10 md:px-6 md:py-12">
-    <div class="mb-5 flex flex-col gap-3 min-[420px]:flex-row min-[420px]:items-end min-[420px]:justify-between md:mb-7"><div><p class="font-bold text-orange-500">Übungsmodus</p><h1 class="text-3xl font-black text-stone-800 md:text-4xl">{{ topic.emoji }} {{ topic.title }}</h1></div><button class="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 font-bold text-violet-700 shadow-sm md:px-5" @click="scratchpad = true"><Pencil :size="18" /> Schmierblatt</button></div>
-    <div class="mb-6 flex snap-x gap-2 overflow-x-auto overscroll-x-contain pb-2 md:mb-8 md:gap-3" role="tablist" aria-label="Mathe-Themen">
-      <button v-for="item in topics" :id="`tab-${item.key}`" :key="item.key" :aria-controls="`panel-${item.key}`" :aria-selected="selected === item.key" role="tab" :tabindex="selected === item.key ? 0 : -1" :class="selected === item.key ? 'bg-orange-500 text-white' : 'bg-white text-stone-600'" class="min-h-11 shrink-0 snap-start whitespace-nowrap rounded-full px-4 py-2 text-sm font-bold shadow-sm" @click="selected = item.key; startSession(item.key)">{{ item.emoji }} {{ item.title }}</button>
+    <div class="mb-5"><p class="font-bold text-orange-500">Übungsmodus · Klasse {{ profile.currentGrade }}</p><h1 class="mt-1 text-3xl font-black text-stone-800 md:text-4xl">{{ title }}</h1></div>
+    <div class="mb-6 flex snap-x gap-2 overflow-x-auto pb-2" role="tablist" aria-label="Mathe-Themen">
+      <button :aria-selected="selectedTopic === undefined" role="tab" class="min-h-12 shrink-0 rounded-full px-5 py-2 font-bold shadow-sm" :class="selectedTopic === undefined ? 'bg-orange-500 text-white' : 'bg-white text-stone-600'" @click="startSession()">🎯 Gemischt</button>
+      <button v-for="topic in activeTopics" :key="topic.id" :aria-selected="selectedTopic === topic.id" role="tab" class="min-h-12 shrink-0 rounded-full px-5 py-2 font-bold shadow-sm" :class="selectedTopic === topic.id ? 'bg-orange-500 text-white' : 'bg-white text-stone-600'" @click="startSession(topic.id)">{{ topic.icon }} {{ topic.title }}</button>
     </div>
-    <div :id="`panel-${selected}`" class="mx-auto max-w-3xl md:max-w-4xl" role="tabpanel" :aria-labelledby="`tab-${selected}`"><ExerciseCard :key="current.id" :exercise="current" :show-next="submittedExerciseIds.has(current.id) && index < session.length - 1" @solved="solved" @next="nextExercise" /><div class="mt-5 flex items-center text-sm text-stone-500 md:mt-6"><span class="flex items-center gap-2"><BookOpen :size="17" /> Aufgabe {{ index + 1 }} von {{ session.length }}</span></div></div>
-    <Scratchpad v-if="scratchpad" @close="scratchpad = false" />
+    <div v-if="completed" class="mx-auto max-w-3xl rounded-3xl bg-white p-8 text-center shadow-sm">
+      <CheckCircle2 class="mx-auto text-emerald-500" :size="56" />
+      <h2 class="mt-4 text-3xl font-black text-stone-800">Runde geschafft! 🎉</h2>
+      <p class="mt-2 text-stone-600">Du hast {{ creditedIds.size }} von {{ questions.length }} Aufgaben gelöst.</p>
+      <button class="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-orange-500 px-6 py-3 font-bold text-white hover:bg-orange-600" @click="startSession(selectedTopic)"><RotateCcw :size="18" /> Neue Runde</button>
+    </div>
+    <div v-else class="mx-auto max-w-3xl">
+      <CurriculumExerciseCard :key="current.id" :exercise="current" @solved="solved" @next="nextExercise" />
+      <p class="mt-5 flex items-center gap-2 text-sm text-stone-500"><BookOpen :size="17" /> Aufgabe {{ index + 1 }} von {{ questions.length }}</p>
+    </div>
   </main>
 </template>
