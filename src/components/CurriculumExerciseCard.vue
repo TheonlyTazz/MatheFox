@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Check, HelpCircle, RotateCcw, Sparkles } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
+import ExerciseVisual from './ExerciseVisual.vue'
 import type {
   ClockInteractiveData,
   Exercise,
@@ -8,7 +9,10 @@ import type {
   GridAlignmentData,
   MatchingData,
   NumberInputData,
+  NumberWallData,
   ShapeDetectiveData,
+  SpatialGridData,
+  SymmetryGridData,
   TableFillData,
 } from '../types/curriculum'
 
@@ -28,6 +32,9 @@ const numberAnswer = ref('')
 const tableAnswer = ref<Array<string | number>>([])
 const matchingAnswer = ref<number[]>([])
 const gridAnswer = ref<string[]>([])
+const spatialAnswer = ref<number | null>(null)
+const wallAnswer = ref<string[]>([])
+const symmetryAnswer = ref<number[]>([])
 const selectedHour = ref(1)
 const selectedMinute = ref(0)
 const resultMessage = ref('')
@@ -38,6 +45,9 @@ const tableData = computed<TableFillData | null>(() => props.exercise.type === '
 const matchingData = computed<MatchingData | null>(() => props.exercise.type === 'matching' ? props.exercise.data : null)
 const clockData = computed<ClockInteractiveData | null>(() => props.exercise.type === 'clock-interactive' ? props.exercise.data : null)
 const gridData = computed<GridAlignmentData | null>(() => props.exercise.type === 'grid-alignment' ? props.exercise.data : null)
+const spatialData = computed<SpatialGridData | null>(() => props.exercise.type === 'spatial-grid' ? props.exercise.data : null)
+const wallData = computed<NumberWallData | null>(() => props.exercise.type === 'number-wall' ? props.exercise.data : null)
+const symmetryData = computed<SymmetryGridData | null>(() => props.exercise.type === 'symmetry-grid' ? props.exercise.data : null)
 
 const shapeLabels: Record<ShapeDetectiveData['shape'], string> = {
   circle: 'Kreis', triangle: 'Dreieck', square: 'Quadrat', rectangle: 'Rechteck',
@@ -53,8 +63,18 @@ const tableCells = computed(() => {
 const blankTableCells = computed(() => tableCells.value.filter((cell) => cell.value === null))
 const tableValues = computed(() => tableAnswer.value)
 const tableBlankIndex = (rowIndex: number, columnIndex: number): number => blankTableCells.value.findIndex((cell) => cell.rowIndex === rowIndex && cell.columnIndex === columnIndex)
+const wallBlankIndex = (rowIndex: number, columnIndex: number): number => {
+  const rows = wallData.value?.rows
+  if (!rows) throw new Error(`Number wall exercise ${props.exercise.id} has no row data`)
+  let index = 0
+  for (let row = 0; row < rowIndex; row += 1) index += rows[row].filter((value) => value === null).length
+  return index + rows[rowIndex].slice(0, columnIndex).filter((value) => value === null).length
+}
 const matchingReady = computed(() => Boolean(matchingData.value) && matchingAnswer.value.length === matchingData.value?.left.length && matchingAnswer.value.every((item) => item >= 0))
 const gridReady = computed(() => Boolean(gridData.value) && gridAnswer.value.length === gridData.value?.answers.length && gridAnswer.value.every((item) => item.trim() !== ''))
+const wallBlankCount = computed(() => wallData.value?.rows.flat().filter((value) => value === null).length ?? 0)
+const wallReady = computed(() => Boolean(wallData.value) && wallAnswer.value.length === wallBlankCount.value && wallAnswer.value.every((item) => item.trim() !== ''))
+const symmetryReady = computed(() => Boolean(symmetryData.value) && symmetryAnswer.value.length > 0)
 const hasAnswer = computed(() => {
   switch (props.exercise.type) {
     case 'number-input': return numberAnswer.value.trim() !== ''
@@ -64,6 +84,9 @@ const hasAnswer = computed(() => {
     case 'clock-interactive': return true
     case 'grid-alignment': return gridReady.value
     case 'shape-detective': return typeof selected.value === 'string'
+    case 'spatial-grid': return spatialAnswer.value !== null
+    case 'number-wall': return wallReady.value
+    case 'symmetry-grid': return symmetryReady.value
   }
 })
 
@@ -95,6 +118,15 @@ const answerForExercise = (): ExerciseAnswer => {
     case 'matching': return matchingAnswer.value
     case 'clock-interactive': return `${selectedHour.value}:${String(selectedMinute.value).padStart(2, '0')}`
     case 'grid-alignment': return gridAnswer.value.map((item) => Number(item.replace(',', '.')))
+    case 'spatial-grid':
+      if (spatialAnswer.value === null) throw new Error(`Spatial exercise ${props.exercise.id} has no selected cell`)
+      return spatialAnswer.value
+    case 'number-wall': return wallAnswer.value.map((item) => {
+      const numeric = Number(item.replace(',', '.'))
+      if (!Number.isFinite(numeric)) throw new Error(`Number wall exercise ${props.exercise.id} contains a non-numeric answer`)
+      return numeric
+    })
+    case 'symmetry-grid': return [...symmetryAnswer.value].sort((a, b) => a - b)
   }
 }
 
@@ -116,6 +148,9 @@ const retry = (): void => {
   submittedCorrect.value = false
   showHint.value = false
   resultMessage.value = ''
+  spatialAnswer.value = null
+  symmetryAnswer.value = []
+  if (wallData.value) wallAnswer.value = wallData.value.rows.flat().filter((value): value is null => value === null).map(() => '')
 }
 
 const chooseMatching = (side: 'left' | 'right', index: number): void => {
@@ -161,8 +196,63 @@ const initialise = (): void => {
     selectedHour.value = exercise.data.hour === 12 ? 1 : exercise.data.hour + 1
     selectedMinute.value = (exercise.data.minute + 5) % 60
   }
+  if (exercise.type === 'spatial-grid') {
+    const cellCount = exercise.data.columns * exercise.data.rows
+    if (!Number.isInteger(exercise.data.columns) || exercise.data.columns < 1 || !Number.isInteger(exercise.data.rows) || exercise.data.rows < 1) throw new Error(`Spatial exercise ${exercise.id} must have positive integer dimensions`)
+    const referenceIndices = [exercise.data.referenceIndex, exercise.data.secondaryReferenceIndex].filter((index): index is number => index !== undefined)
+    if (![...referenceIndices, exercise.data.answerIndex].every((index) => Number.isInteger(index) && index >= 0 && index < cellCount)) throw new Error(`Spatial exercise ${exercise.id} has an out-of-range cell index`)
+    if (new Set(referenceIndices).size !== referenceIndices.length || referenceIndices.includes(exercise.data.answerIndex)) throw new Error(`Spatial exercise ${exercise.id} reference and answer cells must differ`)
+  }
+  if (exercise.type === 'number-wall') {
+    if (exercise.data.rows.length < 1 || exercise.data.rows.some((row) => row.length < 1)) throw new Error(`Number wall exercise ${exercise.id} must have non-empty rows`)
+    const blanks = exercise.data.rows.flat().filter((value) => value === null).length
+    if (blanks !== exercise.data.answers.length) throw new Error(`Number wall exercise ${exercise.id} has ${blanks} blanks but ${exercise.data.answers.length} answers`)
+    wallAnswer.value = exercise.data.answers.map(() => '')
+  }
+  if (exercise.type === 'symmetry-grid') {
+    const cellCount = exercise.data.columns * exercise.data.rows
+    if (!Number.isInteger(exercise.data.columns) || exercise.data.columns < 3 || !Number.isInteger(exercise.data.rows) || exercise.data.rows < 1 || !Number.isInteger(exercise.data.axisAfterColumn) || exercise.data.axisAfterColumn < 1 || exercise.data.axisAfterColumn >= exercise.data.columns - 1) throw new Error(`Symmetry exercise ${exercise.id} has invalid dimensions or axis`)
+    if ([...exercise.data.filledIndices, ...exercise.data.answerIndices].some((index) => !Number.isInteger(index) || index < 0 || index >= cellCount)) throw new Error(`Symmetry exercise ${exercise.id} has an out-of-range cell index`)
+    if (new Set(exercise.data.filledIndices).size !== exercise.data.filledIndices.length || new Set(exercise.data.answerIndices).size !== exercise.data.answerIndices.length) throw new Error(`Symmetry exercise ${exercise.id} contains duplicate cell indices`)
+    if (exercise.data.filledIndices.some((index) => exercise.data.answerIndices.includes(index))) throw new Error(`Symmetry exercise ${exercise.id} source and answer cells overlap`)
+    const sourceSides = new Set(exercise.data.filledIndices.map((index) => (index % exercise.data.columns) < exercise.data.axisAfterColumn))
+    if (sourceSides.size !== 1 || exercise.data.filledIndices.some((index) => index % exercise.data.columns === exercise.data.axisAfterColumn) || exercise.data.answerIndices.some((index) => index % exercise.data.columns === exercise.data.axisAfterColumn || sourceSides.has((index % exercise.data.columns) < exercise.data.axisAfterColumn))) throw new Error(`Symmetry exercise ${exercise.id} source and answer cells must be on opposite sides of the axis`)
+    const mirroredIndices = exercise.data.filledIndices.map((index) => {
+      const row = Math.floor(index / exercise.data.columns)
+      const column = index % exercise.data.columns
+      return row * exercise.data.columns + (2 * exercise.data.axisAfterColumn - column)
+    }).sort((a, b) => a - b)
+    const answerIndices = [...exercise.data.answerIndices].sort((a, b) => a - b)
+    if (mirroredIndices.length !== answerIndices.length || mirroredIndices.some((index, position) => index !== answerIndices[position])) throw new Error(`Symmetry exercise ${exercise.id} answer cells must mirror the source cells`)
+  }
 }
 initialise()
+
+const spatialCells = computed(() => {
+  const data = spatialData.value
+  if (!data) return []
+  return Array.from({ length: data.columns * data.rows }, (_, index) => index)
+})
+const symmetryCells = computed(() => {
+  const data = symmetryData.value
+  if (!data) return []
+  return Array.from({ length: data.columns * data.rows }, (_, index) => index)
+})
+const symmetrySourceSide = computed<boolean | null>(() => {
+  const data = symmetryData.value
+  if (!data || data.filledIndices.length === 0) return null
+  return (data.filledIndices[0] % data.columns) < data.axisAfterColumn
+})
+const isSymmetrySource = (index: number): boolean => symmetryData.value?.filledIndices.includes(index) ?? false
+const isSymmetryTarget = (index: number): boolean => {
+  const data = symmetryData.value
+  const sourceSide = symmetrySourceSide.value
+  return Boolean(data && sourceSide !== null && index % data.columns !== data.axisAfterColumn && ((index % data.columns) < data.axisAfterColumn) !== sourceSide)
+}
+const toggleSymmetryCell = (index: number): void => {
+  if (submitted.value || isSymmetrySource(index) || !isSymmetryTarget(index)) return
+  symmetryAnswer.value = symmetryAnswer.value.includes(index) ? symmetryAnswer.value.filter((item) => item !== index) : [...symmetryAnswer.value, index]
+}
 </script>
 
 <template>
@@ -171,6 +261,8 @@ initialise()
       <div><span class="text-xs font-bold uppercase tracking-wider text-orange-500">Aufgabe</span><h2 class="mt-1 text-xl font-extrabold leading-tight text-stone-800 md:text-2xl">{{ exercise.title }}</h2><p class="mt-2 text-stone-600">{{ exercise.instruction }}</p></div>
       <span class="w-fit rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700">+{{ exercise.xpReward }} XP</span>
     </div>
+
+    <ExerciseVisual v-if="exercise.visual" :visual="exercise.visual" :disabled="submitted" class="mb-5" />
 
     <div v-if="exercise.type === 'number-input'" class="flex items-center gap-3">
       <input v-model="numberAnswer" :disabled="submitted" inputmode="decimal" aria-label="Deine Antwort" class="min-h-14 min-w-0 flex-1 rounded-2xl border-2 border-stone-200 bg-stone-50 px-4 text-xl outline-none focus:border-orange-400" placeholder="Deine Antwort ..." @keyup.enter="submit" />
@@ -190,6 +282,12 @@ initialise()
     <div v-else-if="exercise.type === 'grid-alignment'" class="mx-auto max-w-sm"><div class="grid grid-cols-[auto_1fr_1fr] items-center gap-2 text-center"><span /><span class="font-bold text-stone-600">Euro</span><span class="font-bold text-stone-600">Cent</span><span class="font-bold text-stone-600">1. Zahl</span><span class="rounded-xl bg-stone-100 p-3 text-lg font-bold text-stone-700">{{ gridValue(0) }}</span><span class="rounded-xl bg-stone-100 p-3 text-lg font-bold text-stone-700">{{ centsLabel(gridValue(1)) }}</span><span class="font-bold text-stone-600">2. Zahl</span><span class="rounded-xl bg-stone-100 p-3 text-lg font-bold text-stone-700">{{ gridValue(2) }}</span><span class="rounded-xl bg-stone-100 p-3 text-lg font-bold text-stone-700">{{ centsLabel(gridValue(3)) }}</span></div><div class="mt-4 grid grid-cols-[auto_1fr_1fr] items-center gap-2"><span class="font-bold text-stone-600">Ergebnis</span><input v-model="gridAnswer[0]" :disabled="submitted" class="min-h-14 w-full rounded-xl border-2 border-orange-200 bg-orange-50 text-center text-lg font-bold outline-none focus:border-orange-400" inputmode="decimal" aria-label="Ergebnis Euro" /><input v-model="gridAnswer[1]" :disabled="submitted" class="min-h-14 w-full rounded-xl border-2 border-orange-200 bg-orange-50 text-center text-lg font-bold outline-none focus:border-orange-400" inputmode="decimal" aria-label="Ergebnis Cent" /></div></div>
 
     <div v-else-if="exercise.type === 'shape-detective'" class="grid gap-3 sm:grid-cols-2"><div class="sm:col-span-2 flex flex-wrap gap-2"> <span v-for="property in exercise.data.properties" :key="property" class="rounded-full bg-violet-50 px-3 py-2 font-bold text-violet-800">{{ property }}</span></div><button v-for="shape in shapeChoices" :key="shape" :disabled="submitted" class="min-h-14 rounded-2xl border-2 p-3 text-left font-bold" :class="selected === shapeLabels[shape] ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-stone-200 bg-stone-50 hover:border-orange-300'" @click="selected = shapeLabels[shape]">{{ shapeLabels[shape] }}</button></div>
+
+    <div v-else-if="exercise.type === 'spatial-grid'" class="mx-auto max-w-sm"><p class="mb-2 text-center font-bold text-stone-600">🔴 = roter Punkt · 🦉 = Eule</p><div class="grid gap-1" :style="{ gridTemplateColumns: `repeat(${exercise.data.columns}, minmax(0, 1fr))` }"><button v-for="index in spatialCells" :key="index" :disabled="submitted || index === exercise.data.referenceIndex || index === exercise.data.secondaryReferenceIndex" class="aspect-square rounded-lg border-2 text-2xl" :class="index === exercise.data.referenceIndex || index === exercise.data.secondaryReferenceIndex ? 'border-orange-400 bg-orange-100' : spatialAnswer === index ? 'border-orange-500 bg-orange-50' : 'border-stone-200 bg-stone-50 hover:border-orange-300'" @click="spatialAnswer = index">{{ index === exercise.data.referenceIndex || index === exercise.data.secondaryReferenceIndex ? exercise.data.reference : spatialAnswer === index ? '🦉' : '' }}</button></div></div>
+
+    <div v-else-if="exercise.type === 'number-wall'" class="mx-auto max-w-sm"><div class="flex flex-col items-center gap-1"><div v-for="(row, rowIndex) in exercise.data.rows" :key="rowIndex" class="flex gap-1" :style="{ width: `${Math.max(1, row.length) * 4.5}rem` }"><template v-for="(value, columnIndex) in row" :key="`${rowIndex}-${columnIndex}`"><span v-if="value !== null" class="flex h-12 flex-1 items-center justify-center rounded-lg bg-stone-100 font-bold">{{ value }}</span><input v-else v-model="wallAnswer[wallBlankIndex(rowIndex, columnIndex)]" :disabled="submitted" class="h-12 min-w-0 flex-1 rounded-lg border-2 border-orange-200 bg-orange-50 text-center font-bold" inputmode="numeric" aria-label="Zahlenmauer Lücke" /></template></div></div></div>
+
+    <div v-else-if="exercise.type === 'symmetry-grid'" class="mx-auto max-w-sm"><div class="relative grid gap-1" :style="{ gridTemplateColumns: `repeat(${exercise.data.columns}, minmax(0, 1fr))` }"><span class="pointer-events-none absolute inset-y-0 z-10 w-1 bg-violet-600" :style="{ left: `${((exercise.data.axisAfterColumn + 0.5) / exercise.data.columns) * 100}%`, transform: 'translateX(-50%)' }" aria-hidden="true" /><button v-for="index in symmetryCells" :key="index" :disabled="submitted || isSymmetrySource(index) || !isSymmetryTarget(index)" class="aspect-square rounded-lg border-2 text-lg" :class="isSymmetrySource(index) ? 'border-violet-500 bg-violet-400' : symmetryAnswer.includes(index) ? 'border-orange-500 bg-orange-50' : 'border-stone-200 bg-stone-50 hover:border-orange-300'" @click="toggleSymmetryCell(index)">{{ isSymmetrySource(index) ? '●' : symmetryAnswer.includes(index) ? '●' : '' }}</button></div><p class="mt-2 text-center text-sm text-stone-500">Spiegelachse in Spalte {{ exercise.data.axisAfterColumn + 1 }}</p></div>
 
     <div class="mt-5 grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:flex">
       <button v-if="!submitted" :disabled="!hasAnswer" class="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-orange-600" @click="submit"><Check :size="18" /> Prüfen</button>

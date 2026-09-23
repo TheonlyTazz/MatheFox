@@ -14,9 +14,9 @@ MatheFox verwandelt Matheübungen in kurze Missionen. Beim ersten Besuch wählen
 
 ## Highlights
 
-- 📚 22 Schwerpunkte in vier getrennten Klassenkatalogen
+- 📚 40 Schwerpunkte in vier getrennten Klassenkatalogen
 - 🎯 Gemischte Missionen nur aus den gewählten Themen sowie gezieltes Üben einzelner Themen
-- 🔁 Generierte Rechenaufgaben und strukturierte Aufgaben mit Tabellen, Zuordnungen, Uhr und Formen
+- 🔁 Generierte Rechenaufgaben und strukturierte Aufgaben mit Tabellen, Zuordnungen, Uhr, Zahlenmauern, Glücksrädern und Symmetrie-Gittern
 - ⚙️ Klassenstufe und aktive Themen jederzeit im Kopfbereich ändern
 - 🧪 Prüfungs-Simulator für die Mathearbeit vom 29.09.2026 in Klasse 4, wenn alle Themen aktiv sind
 - 🏆 XP, Lern-Streaks und Themen-Abzeichen

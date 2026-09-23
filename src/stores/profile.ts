@@ -14,11 +14,18 @@ export interface UserProfile {
   unlockedBadgeIds: string[]
   completedTopicIds: string[]
   lastPlayed: string
+  catalogVersion?: 2
 }
 
 const STORAGE_KEY = 'mathefox-profile'
 const avatars = ['owl', 'fox', 'cat', 'robot', 'bear', 'dragon'] as const
 const grades: readonly GradeLevel[] = [1, 2, 3, 4]
+const previousTopicIds: Readonly<Record<GradeLevel, readonly string[]>> = {
+  1: ['g1_zahlenraum_20', 'g1_addition_subtraktion', 'g1_uhrzeit_geld', 'g1_geometrie_formen'],
+  2: ['g2_zahlenraum_100', 'g2_einmaleins', 'g2_halbschriftlich', 'g2_uhrzeit_zeitspannen', 'g2_geometrie_symmetrie'],
+  3: ['g3_zahlenraum_1000', 'g3_schriftlich_plus_minus', 'g3_multiplikation_division', 'g3_groessen_einheiten', 'g3_geometrie_koerper'],
+  4: ['g4_klammern_punkt_strich', 'g4_schriftlich_komma', 'g4_zeit_umrechnung', 'g4_preistabellen', 'g4_fachbegriffe', 'g4_schriftlich_mult_div', 'g4_geometrie_begruendung', 'g4_sachrechnen_ungleichungen'],
+}
 
 const topicsFor = (grade: GradeLevel): string[] => getGradeCatalog(grade).topics.map((topic) => topic.id)
 const allTopicIds = (): string[] => grades.flatMap((grade) => topicsFor(grade))
@@ -26,7 +33,7 @@ const allTopicIds = (): string[] => grades.flatMap((grade) => topicsFor(grade))
 const defaultProfile = (): UserProfile => ({
   nickname: 'Mathe-Held', avatar: 'fox', currentGrade: 1,
   activeTopicIds: topicsFor(1), hasCompletedWizard: false,
-  dailyStreak: 0, xp: 0, unlockedBadgeIds: [], completedTopicIds: [], lastPlayed: '',
+  dailyStreak: 0, xp: 0, unlockedBadgeIds: [], completedTopicIds: [], lastPlayed: '', catalogVersion: 2,
 })
 
 const isGrade = (value: unknown): value is GradeLevel => grades.includes(value as GradeLevel)
@@ -45,6 +52,7 @@ const isProfile = (value: unknown): value is UserProfile => {
     && candidate.unlockedBadgeIds.every((badgeId) => badgeId.startsWith('topic:') && allTopicIds().includes(badgeId.slice(6)))
     && isStringArray(candidate.completedTopicIds) && hasUniqueItems(candidate.completedTopicIds)
     && typeof candidate.lastPlayed === 'string'
+    && (candidate.catalogVersion === undefined || candidate.catalogVersion === 2)
 }
 
 const loadProfile = (): UserProfile => {
@@ -57,7 +65,16 @@ const loadProfile = (): UserProfile => {
     const validTopics = topicsFor(parsed.currentGrade)
     if (parsed.activeTopicIds.some((topicId) => !validTopics.includes(topicId))) throw new Error('Invalid topic selection')
     if (parsed.completedTopicIds.some((topicId) => !allTopicIds().includes(topicId))) throw new Error('Invalid completed topic')
-    return parsed
+    if (parsed.catalogVersion === 2) return parsed
+    const oldTopics = previousTopicIds[parsed.currentGrade]
+    const hadAllOldTopics = parsed.activeTopicIds.length === oldTopics.length && oldTopics.every((topicId) => parsed.activeTopicIds.includes(topicId))
+    const migrated: UserProfile = {
+      ...parsed,
+      activeTopicIds: hadAllOldTopics ? validTopics : parsed.activeTopicIds,
+      catalogVersion: 2,
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
+    return migrated
   } catch (error) {
     throw new Error(`Stored profile is invalid: ${error instanceof Error ? error.message : 'invalid JSON'}`)
   }
@@ -83,7 +100,7 @@ export const useProfileStore = defineStore('profile', () => {
     activeTopicIds: activeTopicIds.value, hasCompletedWizard: hasCompletedWizard.value,
     dailyStreak: dailyStreak.value, xp: xp.value, unlockedBadgeIds: unlockedBadgeIds.value,
     completedTopicIds: completedTopicIds.value,
-    lastPlayed: lastPlayed.value,
+    lastPlayed: lastPlayed.value, catalogVersion: 2,
     } satisfies UserProfile
     if (!isProfile(snapshot)) throw new Error('Profile mutation produced an invalid state')
     const validActiveTopics = topicsFor(snapshot.currentGrade)
