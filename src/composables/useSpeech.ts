@@ -1,166 +1,197 @@
-import { onMounted, onUnmounted, ref, type Ref } from 'vue'
+import { ref, type Ref } from 'vue'
 
-const unsupportedMessage =
-  'Die Vorlesefunktion wird von diesem Browser nicht unterstützt. Bitte verwende einen aktuellen Browser mit aktivierter Sprachausgabe.'
+type SpeechResponse =
+  | { id: number; type: 'status'; installed: boolean }
+  | { id: number; type: 'ready' }
+  | { id: number; type: 'audio'; blob: Blob }
+  | { id: number; type: 'progress'; loaded: number; total: number }
+  | { id: number; type: 'error'; message: string }
 
-export const primeSpeechVoices = (): void => {
-  if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.getVoices()
+type SpeechRequest =
+  | { id: number; type: 'status' }
+  | { id: number; type: 'prepare' }
+  | { id: number; type: 'synthesize'; text: string }
+
+type SpeechRequestInput =
+  | { type: 'status' }
+  | { type: 'prepare' }
+  | { type: 'synthesize'; text: string }
+
+type PendingRequest = {
+  resolve: (response: SpeechResponse) => void
+  reject: (error: Error) => void
 }
 
-/**
- * Provides the browser's native German speech synthesis for an exercise.
- *
- * Speech synthesis is looked up lazily so this composable can also be used
- * while rendering on the server.
- */
-export function useSpeech(): {
-  speak: (text: string) => void
-  stop: () => void
-  isSpeaking: Ref<boolean>
-  isLoading: Ref<boolean>
-  error: Ref<string | null>
-} {
-  const isSpeaking = ref(false)
-  const isLoading = ref(false)
-  const error = ref<string | null>(null)
-  let synthesis: SpeechSynthesis | null = null
-  let deVoice: SpeechSynthesisVoice | null = null
-  let activeUtterance: SpeechSynthesisUtterance | null = null
-  let pendingText: string | null = null
-  let pendingTimeout: number | null = null
+const isInstalled = ref(false)
+const isChecking = ref(false)
+const isLoading = ref(false)
+const isSpeaking = ref(false)
+const downloadLoaded = ref(0)
+const downloadTotal = ref(0)
+const error = ref<string | null>(null)
 
-  const getSynthesis = (): SpeechSynthesis | null => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      return null
-    }
+let worker: Worker | null = null
+let nextRequestId = 1
+let preparation: Promise<void> | null = null
+let installationCheck: Promise<boolean> | null = null
+let audio: HTMLAudioElement | null = null
+let audioUrl: string | null = null
+let speechSequence = 0
+const requests = new Map<number, PendingRequest>()
 
-    synthesis ??= window.speechSynthesis
-    return synthesis
+const getWorker = (): Worker => {
+  if (typeof Worker === 'undefined' || !navigator.storage || typeof navigator.storage.getDirectory !== 'function') {
+    throw new Error('Diese Offline-Stimme benötigt einen aktuellen Browser mit lokalem Speicher.')
   }
-
-  const chooseGermanVoice = (): void => {
-    if (!synthesis) {
-      return
-    }
-
-    const voices = synthesis.getVoices()
-    const germanVoices = voices.filter((voice) => voice.localService && voice.lang.toLowerCase().startsWith('de'))
-
-    deVoice =
-      germanVoices.find((voice) => /natural|premium|enhanced/i.test(voice.name)) ??
-      germanVoices.find((voice) => voice.lang.toLowerCase() === 'de-de') ??
-      germanVoices[0] ??
-      null
-  }
-
-  const handleVoicesChanged = (): void => {
-    chooseGermanVoice()
-    if (pendingText !== null) {
-      const text = pendingText
-      pendingText = null
-      if (pendingTimeout !== null) window.clearTimeout(pendingTimeout)
-      pendingTimeout = null
-      isLoading.value = false
-      if (deVoice === null) {
-        error.value = 'Keine lokale deutsche Stimme verfügbar. Bitte installiere eine deutsche Systemstimme.'
+  if (worker === null) {
+    worker = new Worker(new URL('../workers/speech.worker.ts', import.meta.url), { type: 'module' })
+    worker.addEventListener('message', (event: MessageEvent<SpeechResponse>) => {
+      const response = event.data
+      if (response.type === 'progress') {
+        downloadLoaded.value = response.loaded
+        downloadTotal.value = response.total
         return
       }
-      speak(text)
-    }
+      const pending = requests.get(response.id)
+      if (!pending) throw new Error(`Unexpected speech response: ${response.id}`)
+      requests.delete(response.id)
+      if (response.type === 'error') pending.reject(new Error(response.message))
+      else pending.resolve(response)
+    })
+    worker.addEventListener('error', (event: ErrorEvent) => {
+      const failure = new Error(`Offline-Stimme konnte nicht gestartet werden: ${event.message}`)
+      for (const pending of requests.values()) pending.reject(failure)
+      requests.clear()
+      worker?.terminate()
+      worker = null
+      error.value = failure.message
+    })
   }
+  return worker
+}
 
-  const stop = (): void => {
-    const shouldCancel = activeUtterance !== null
-    activeUtterance = null
-    isSpeaking.value = false
-    isLoading.value = false
-    pendingText = null
-    if (pendingTimeout !== null) window.clearTimeout(pendingTimeout)
-    pendingTimeout = null
-    if (shouldCancel) getSynthesis()?.cancel()
-  }
-
-  const speak = (text: string): void => {
-    const phrase = text.trim()
-    if (!phrase) {
-      throw new Error('Vorlesetext darf nicht leer sein.')
-    }
-
-    const currentSynthesis = getSynthesis()
-    if (!currentSynthesis) {
-      throw new Error(unsupportedMessage)
-    }
-
-    chooseGermanVoice()
-    error.value = null
-    if (deVoice === null && currentSynthesis.getVoices().length === 0) {
-      pendingText = phrase
-      isLoading.value = true
-      if (pendingTimeout !== null) window.clearTimeout(pendingTimeout)
-      pendingTimeout = window.setTimeout(() => {
-        pendingText = null
-        pendingTimeout = null
-        isLoading.value = false
-        error.value = 'Keine lokale deutsche Stimme geladen. Bitte installiere eine deutsche Systemstimme.'
-      }, 5000)
-      return
-    }
-    if (deVoice === null) throw new Error('Keine lokale deutsche Stimme verfügbar. Bitte installiere eine deutsche Systemstimme für die Offline-Vorlesefunktion.')
-    pendingText = null
-    if (pendingTimeout !== null) window.clearTimeout(pendingTimeout)
-    pendingTimeout = null
-    isLoading.value = false
-    if (activeUtterance !== null || currentSynthesis.speaking || currentSynthesis.pending) currentSynthesis.cancel()
-
-    const utterance = new SpeechSynthesisUtterance(phrase)
-    utterance.lang = 'de-DE'
-    utterance.pitch = 1
-    utterance.rate = 1
-    utterance.voice = deVoice
-
-    activeUtterance = utterance
-    isSpeaking.value = false
-
-    utterance.onstart = (): void => {
-      if (activeUtterance === utterance) {
-        isSpeaking.value = true
-      }
-    }
-    utterance.onend = (): void => {
-      if (activeUtterance === utterance) {
-        activeUtterance = null
-        isSpeaking.value = false
-      }
-    }
-    utterance.onerror = (event): void => {
-      if (activeUtterance === utterance) {
-        activeUtterance = null
-        isSpeaking.value = false
-        error.value = `Vorlesen fehlgeschlagen: ${event.error}`
-      }
-    }
-
-    currentSynthesis.speak(utterance)
-  }
-
-  onMounted(() => {
-    const currentSynthesis = getSynthesis()
-    if (currentSynthesis) {
-      chooseGermanVoice()
-      currentSynthesis.addEventListener('voiceschanged', handleVoicesChanged)
+const request = (message: SpeechRequestInput): Promise<SpeechResponse> => {
+  const id = nextRequestId++
+  return new Promise<SpeechResponse>((resolve, reject) => {
+    requests.set(id, { resolve, reject })
+    try {
+      getWorker().postMessage({ ...message, id } satisfies SpeechRequest)
+    } catch (failure) {
+      requests.delete(id)
+      reject(failure instanceof Error ? failure : new Error(String(failure)))
     }
   })
+}
 
-  onUnmounted(() => {
-    if (pendingTimeout !== null) window.clearTimeout(pendingTimeout)
-    if (synthesis) {
-      synthesis.removeEventListener('voiceschanged', handleVoicesChanged)
-      if (activeUtterance !== null) synthesis.cancel()
-    }
-    activeUtterance = null
-    isSpeaking.value = false
-    isLoading.value = false
+const checkInstalled = (): Promise<boolean> => {
+  if (isInstalled.value) return Promise.resolve(true)
+  if (installationCheck !== null) return installationCheck
+  isChecking.value = true
+  installationCheck = request({ type: 'status' }).then((response) => {
+    if (response.type !== 'status') throw new Error(`Unexpected speech status: ${response.type}`)
+    isInstalled.value ||= response.installed
+    return isInstalled.value
+  }).catch((failure: unknown) => {
+    error.value = failure instanceof Error ? failure.message : String(failure)
+    throw failure
+  }).finally(() => {
+    isChecking.value = false
+    installationCheck = null
   })
+  return installationCheck
+}
 
-  return { speak, stop, isSpeaking, isLoading, error }
+const prepareVoice = (): Promise<void> => {
+  if (preparation !== null) return preparation
+  error.value = null
+  isLoading.value = true
+  downloadLoaded.value = 0
+  downloadTotal.value = 0
+  preparation = request({ type: 'prepare' }).then((response) => {
+    if (response.type !== 'ready') throw new Error(`Unexpected speech preparation: ${response.type}`)
+    isInstalled.value = true
+  }).catch((failure: unknown) => {
+    error.value = failure instanceof Error ? failure.message : String(failure)
+    throw failure
+  }).finally(() => {
+    isLoading.value = false
+    preparation = null
+  })
+  return preparation
+}
+
+const stopPlayback = (): void => {
+  if (audio !== null) {
+    audio.onended = null
+    audio.onerror = null
+    audio.pause()
+    audio.src = ''
+    audio = null
+  }
+  if (audioUrl !== null) {
+    URL.revokeObjectURL(audioUrl)
+    audioUrl = null
+  }
+  isSpeaking.value = false
+}
+
+const stop = (): void => {
+  speechSequence += 1
+  stopPlayback()
+  isLoading.value = preparation !== null
+}
+
+const speak = async (text: string): Promise<void> => {
+  const phrase = text.trim()
+  if (!phrase) throw new Error('Vorlesetext darf nicht leer sein.')
+  if (!isInstalled.value && !(await checkInstalled())) {
+    throw new Error('Bitte lade zuerst die kostenlose Offline-Stimme Ramona.')
+  }
+  const sequence = ++speechSequence
+  stopPlayback()
+  isLoading.value = true
+  error.value = null
+  try {
+    await prepareVoice()
+    if (sequence !== speechSequence) return
+    isLoading.value = true
+    const response = await request({ type: 'synthesize', text: phrase })
+    if (response.type !== 'audio') throw new Error(`Unexpected speech audio: ${response.type}`)
+    if (sequence !== speechSequence) return
+    audioUrl = URL.createObjectURL(response.blob)
+    audio = new Audio(audioUrl)
+    audio.onended = () => { if (sequence === speechSequence) stopPlayback() }
+    audio.onerror = () => {
+      if (sequence === speechSequence) {
+        error.value = 'Die erzeugte Sprachausgabe konnte nicht abgespielt werden.'
+        stopPlayback()
+      }
+    }
+    await audio.play()
+    if (sequence === speechSequence) isSpeaking.value = true
+  } catch (failure) {
+    if (sequence === speechSequence) {
+      error.value = failure instanceof Error ? failure.message : String(failure)
+      stopPlayback()
+    }
+    throw failure
+  } finally {
+    if (sequence === speechSequence) isLoading.value = false
+  }
+}
+
+export function useSpeech(): {
+  speak: (text: string) => Promise<void>
+  stop: () => void
+  checkInstalled: () => Promise<boolean>
+  prepareVoice: () => Promise<void>
+  isInstalled: Ref<boolean>
+  isChecking: Ref<boolean>
+  isLoading: Ref<boolean>
+  isSpeaking: Ref<boolean>
+  downloadLoaded: Ref<number>
+  downloadTotal: Ref<number>
+  error: Ref<string | null>
+} {
+  return { speak, stop, checkInstalled, prepareVoice, isInstalled, isChecking, isLoading, isSpeaking, downloadLoaded, downloadTotal, error }
 }

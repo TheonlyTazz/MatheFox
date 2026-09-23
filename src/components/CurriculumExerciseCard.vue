@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Check, HelpCircle, RotateCcw, Sparkles } from 'lucide-vue-next'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import confetti from 'canvas-confetti'
 import ExerciseVisual from './ExerciseVisual.vue'
 import DraggableClockWidget from './widgets/DraggableClockWidget.vue'
 import ShapeSelectWidget from './widgets/ShapeSelectWidget.vue'
 import ComparisonWidget from './widgets/ComparisonWidget.vue'
 import MirrorGridWidget from './widgets/MirrorGridWidget.vue'
+import SpeechVoiceSetup from './SpeechVoiceSetup.vue'
 import { useSpeech } from '../composables/useSpeech'
 import { playBeep } from '../services/audio'
 import { useProfileStore } from '../stores/profile'
@@ -32,10 +33,16 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ solved: [correct: boolean, credit: boolean]; next: [] }>()
 const profile = useProfileStore()
-const { speak, stop, isSpeaking, isLoading: speechLoading, error: speechError } = useSpeech()
+const { speak, stop, checkInstalled, isInstalled: speechInstalled, isSpeaking, isLoading: speechLoading, error: speechError } = useSpeech()
+const showVoiceSetup = ref(false)
 const readAloud = (text: string): void => {
-  try { speak(text) }
-  catch (error) { speechError.value = error instanceof Error ? error.message : 'Vorlesen fehlgeschlagen.' }
+  if (!speechInstalled.value) {
+    showVoiceSetup.value = true
+    return
+  }
+  void speak(text).catch((failure: unknown) => {
+    speechError.value = failure instanceof Error ? failure.message : String(failure)
+  })
 }
 
 const submitted = ref(false)
@@ -270,9 +277,20 @@ const initialise = (): void => {
   }
 }
 initialise()
+let cardMounted = false
 onMounted(() => {
-  if (props.exercise.grade <= 2 && profile.autoReadQuestions) readAloud(`${props.exercise.title}. ${props.exercise.instruction}`)
+  cardMounted = true
+  void checkInstalled().then((installed) => {
+    if (!cardMounted) return
+    if (props.exercise.grade <= 2 && profile.autoReadQuestions) {
+      if (installed) readAloud(`${props.exercise.title}. ${props.exercise.instruction}`)
+      else showVoiceSetup.value = true
+    }
+  }).catch((failure: unknown) => {
+    if (cardMounted) speechError.value = failure instanceof Error ? failure.message : String(failure)
+  })
 })
+onUnmounted(() => { cardMounted = false; stop() })
 watch(() => profile.autoReadQuestions, (enabled) => {
   if (!enabled) stop()
 })
@@ -311,7 +329,8 @@ const toggleSymmetryCell = (index: number): void => {
       <span class="w-fit rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700">+{{ exercise.xpReward }} XP</span>
     </div>
 
-    <p v-if="speechLoading" class="mb-4 rounded-xl bg-violet-50 p-3 text-sm text-violet-800" role="status">Deutsche Stimme wird geladen …</p>
+    <SpeechVoiceSetup v-if="showVoiceSetup && !speechInstalled" class="mb-4" />
+    <p v-if="speechLoading && speechInstalled" class="mb-4 rounded-xl bg-violet-50 p-3 text-sm text-violet-800" role="status">Ramona bereitet die Sprachausgabe vor …</p>
     <p v-if="speechError" class="mb-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-800" role="alert">{{ speechError }}</p>
     <ExerciseVisual v-if="exercise.visual" :visual="exercise.visual" :disabled="submitted" class="mb-5" @answer="numberAnswer = String($event)" />
 

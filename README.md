@@ -18,7 +18,7 @@ MatheFox verwandelt Matheübungen in kurze Missionen. Beim ersten Besuch wählen
 - 🎯 Gemischte Missionen nur aus den gewählten Themen sowie gezieltes Üben einzelner Themen
 - 🔁 Generierte Rechenaufgaben und strukturierte Aufgaben mit Tabellen, Zuordnungen, Uhr, Zahlenmauern, Glücksrädern und Symmetrie-Gittern
 - 🖐️ Interaktive Lernhilfen für Klasse 1 und 2: Zeigeruhr, Zehner-/Zwanzigerfeld, Münzen, Punktefeld, Spiegelgitter und Zahlenstrahl
-- 🔊 Deutsche Offline-Vorlesefunktion mit optionalem automatischem Vorlesen und optionalen Klängen
+- 🔊 Optionale deutsche Offline-Vorlesefunktion mit Ramona und optionalen Klängen
 - ⚙️ Klassenstufe und aktive Themen jederzeit im Kopfbereich ändern
 - 🧪 Prüfungs-Simulator für die Mathearbeit vom 29.09.2026 in Klasse 4, wenn alle Themen aktiv sind
 - 🏆 XP, Lern-Streaks und Themen-Abzeichen
@@ -31,6 +31,12 @@ MatheFox verwandelt Matheübungen in kurze Missionen. Beim ersten Besuch wählen
 Der Übungsmodus erzeugt neue Aufgaben aus den aktiven Themen der gewählten Klasse. Eine gemischte Mission enthält zehn Aufgaben; eine Themenrunde enthält sechs. Falsche Antworten können erneut versucht werden. Nach einer vollständig gelösten Themenrunde wird ein Abzeichen freigeschaltet.
 
 Das Profil mit Klasse, Themen, XP und Abzeichen wird automatisch im lokalen Browserspeicher gesichert. Für Klasse 4 bleibt die Probearbeit vom 29.09.2026 verfügbar.
+
+### Vorlesen mit Ramona
+
+Die kostenlose deutsche Stimme Ramona wird erst auf ausdrücklichen Klick geladen. Der erste Download umfasst ungefähr 95 MB für Stimme und Sprachlaufzeit. Danach erzeugt der Browser die Sprache auf dem Gerät; es gibt keinen Sprachdienst, kein Konto und keine laufenden Kosten. Der erste gesprochene Satz kann etwas länger dauern, während die Laufzeit startet. Die Stimme bleibt im lokalen Browserspeicher, solange der Browser diese Daten nicht löscht. Ohne Installation bleiben alle Übungen nutzbar.
+
+Ramona stammt aus den [Piper-Stimmen von Rhasspy](https://huggingface.co/rhasspy/piper-voices/tree/main/de/de_DE/ramona/low). Das Training nutzte den [M-AILABS-Datensatz](https://github.com/i-celeste-aurora/m-ailabs-dataset/blob/master/README.md), dessen Nutzung eine Quellenangabe erfordert. Die Sprachausgabe im Browser nutzt [Piper TTS Web](https://github.com/Mintplex-Labs/piper-tts-web).
 
 ## Lokal starten
 
@@ -54,7 +60,7 @@ Der Build prüft zuerst die TypeScript-Typen und erzeugt anschließend das Produ
 
 ## GitHub Pages
 
-Die App ist für GitHub Pages mit einem relativen Vite-Basispfad (`./`) konfiguriert. Jeder Push auf `main` startet den Workflow [`deploy.yml`](.github/workflows/deploy.yml), baut die App und veröffentlicht `dist`.
+Die App ist für GitHub Pages mit dem Vite-Basispfad `/MatheFox/` konfiguriert. Jeder Push auf `main` startet den Workflow [`deploy.yml`](.github/workflows/deploy.yml), baut die App und veröffentlicht `dist`.
 
 Live-Adresse:
 

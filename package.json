@@ -4,20 +4,26 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/patch-piper.mjs",
+    "predev": "node scripts/copy-speech-assets.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-speech-assets.mjs",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mintplex-labs/piper-tts-web": "^1.0.5",
     "canvas-confetti": "^1.9.3",
     "lucide-vue-next": "^0.468.0",
+    "onnxruntime-web": "^1.30.0",
     "pinia": "^2.3.0",
     "vue": "^3.5.13"
   },
   "devDependencies": {
+    "@diffusionstudio/piper-wasm": "^1.0.0",
     "@tailwindcss/vite": "^4.0.0",
-    "@vitejs/plugin-vue": "^5.2.1",
     "@types/node": "^22.10.2",
+    "@vitejs/plugin-vue": "^5.2.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
