@@ -20,7 +20,6 @@ const selected = computed(() => props.modelValue)
 const select = (shape: string): void => {
   if (!props.disabled) {
     emit('update:modelValue', shape)
-    emit('speak', shape)
   }
 }
 </script>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Check, HelpCircle, RotateCcw, Sparkles } from 'lucide-vue-next'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import confetti from 'canvas-confetti'
 import ExerciseVisual from './ExerciseVisual.vue'
 import DraggableClockWidget from './widgets/DraggableClockWidget.vue'
@@ -32,7 +32,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ solved: [correct: boolean, credit: boolean]; next: [] }>()
 const profile = useProfileStore()
-const { speak, isSpeaking, error: speechError } = useSpeech()
+const { speak, stop, isSpeaking, isLoading: speechLoading, error: speechError } = useSpeech()
 const readAloud = (text: string): void => {
   try { speak(text) }
   catch (error) { speechError.value = error instanceof Error ? error.message : 'Vorlesen fehlgeschlagen.' }
@@ -168,7 +168,6 @@ const submit = (): void => {
     void confetti({ particleCount: 65, spread: 70, origin: { y: 0.65 } })
   } else {
     mistakeCount.value += 1
-    playBeep(330, 0.08)
   }
   if (correct && !credited.value) {
     credited.value = true
@@ -274,6 +273,9 @@ initialise()
 onMounted(() => {
   if (props.exercise.grade <= 2 && profile.autoReadQuestions) readAloud(`${props.exercise.title}. ${props.exercise.instruction}`)
 })
+watch(() => profile.autoReadQuestions, (enabled) => {
+  if (!enabled) stop()
+})
 
 const spatialCells = computed(() => {
   const data = spatialData.value
@@ -309,6 +311,7 @@ const toggleSymmetryCell = (index: number): void => {
       <span class="w-fit rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700">+{{ exercise.xpReward }} XP</span>
     </div>
 
+    <p v-if="speechLoading" class="mb-4 rounded-xl bg-violet-50 p-3 text-sm text-violet-800" role="status">Deutsche Stimme wird geladen …</p>
     <p v-if="speechError" class="mb-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-800" role="alert">{{ speechError }}</p>
     <ExerciseVisual v-if="exercise.visual" :visual="exercise.visual" :disabled="submitted" class="mb-5" @answer="numberAnswer = String($event)" />
 
@@ -333,7 +336,7 @@ const toggleSymmetryCell = (index: number): void => {
     <ComparisonWidget v-else-if="exercise.type === 'comparison'" v-model="comparisonSelection" :left="exercise.data.left" :right="exercise.data.right" :disabled="submitted" @speak="readAloud" />
     <MirrorGridWidget v-else-if="exercise.type === 'mirror-grid'" v-model="mirrorAnswer" :filled-indices="exercise.data.filledIndices" :disabled="submitted" @speak="readAloud" />
 
-    <div v-else-if="exercise.type === 'spatial-grid'" class="mx-auto max-w-sm"><p class="mb-2 text-center font-bold text-stone-600">🔴 = roter Punkt · 🦉 = Eule</p><div class="grid gap-1" :style="{ gridTemplateColumns: `repeat(${exercise.data.columns}, minmax(0, 1fr))` }"><button v-for="index in spatialCells" :key="index" :disabled="submitted || index === exercise.data.referenceIndex || index === exercise.data.secondaryReferenceIndex" class="aspect-square min-h-14 min-w-14 rounded-lg border-2 text-2xl" :class="index === exercise.data.referenceIndex || index === exercise.data.secondaryReferenceIndex ? 'border-orange-400 bg-orange-100' : spatialAnswer === index ? 'border-orange-500 bg-orange-50' : 'border-stone-200 bg-stone-50 hover:border-orange-300'" :aria-label="`Reihe ${Math.floor(index / exercise.data.columns) + 1}, Spalte ${index % exercise.data.columns + 1}`" @click="spatialAnswer = index; readAloud(`Reihe ${Math.floor(index / exercise.data.columns) + 1}, Spalte ${index % exercise.data.columns + 1}`)">{{ index === exercise.data.referenceIndex || index === exercise.data.secondaryReferenceIndex ? exercise.data.reference : spatialAnswer === index ? '🦉' : '' }}</button></div></div>
+    <div v-else-if="exercise.type === 'spatial-grid'" class="mx-auto max-w-sm"><p class="mb-2 text-center font-bold text-stone-600">🔴 = roter Punkt · 🦉 = Eule</p><div class="grid gap-1" :style="{ gridTemplateColumns: `repeat(${exercise.data.columns}, minmax(0, 1fr))` }"><button v-for="index in spatialCells" :key="index" :disabled="submitted || index === exercise.data.referenceIndex || index === exercise.data.secondaryReferenceIndex" class="aspect-square min-h-14 min-w-14 rounded-lg border-2 text-2xl" :class="index === exercise.data.referenceIndex || index === exercise.data.secondaryReferenceIndex ? 'border-orange-400 bg-orange-100' : spatialAnswer === index ? 'border-orange-500 bg-orange-50' : 'border-stone-200 bg-stone-50 hover:border-orange-300'" :aria-label="`Reihe ${Math.floor(index / exercise.data.columns) + 1}, Spalte ${index % exercise.data.columns + 1}`" @click="spatialAnswer = index">{{ index === exercise.data.referenceIndex || index === exercise.data.secondaryReferenceIndex ? exercise.data.reference : spatialAnswer === index ? '🦉' : '' }}</button></div></div>
 
     <div v-else-if="exercise.type === 'number-wall'" class="mx-auto max-w-sm"><div class="flex flex-col items-center gap-1"><div v-for="(row, rowIndex) in exercise.data.rows" :key="rowIndex" class="flex gap-1" :style="{ width: `${Math.max(1, row.length) * 4.5}rem` }"><template v-for="(value, columnIndex) in row" :key="`${rowIndex}-${columnIndex}`"><span v-if="value !== null" class="flex h-12 flex-1 items-center justify-center rounded-lg bg-stone-100 font-bold">{{ value }}</span><input v-else v-model="wallAnswer[wallBlankIndex(rowIndex, columnIndex)]" :disabled="submitted" class="h-12 min-w-0 flex-1 rounded-lg border-2 border-orange-200 bg-orange-50 text-center font-bold" inputmode="numeric" aria-label="Zahlenmauer Lücke" /></template></div></div></div>
 

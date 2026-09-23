@@ -3,6 +3,10 @@ import { onMounted, onUnmounted, ref, type Ref } from 'vue'
 const unsupportedMessage =
   'Die Vorlesefunktion wird von diesem Browser nicht unterstützt. Bitte verwende einen aktuellen Browser mit aktivierter Sprachausgabe.'
 
+export const primeSpeechVoices = (): void => {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.getVoices()
+}
+
 /**
  * Provides the browser's native German speech synthesis for an exercise.
  *
@@ -13,9 +17,11 @@ export function useSpeech(): {
   speak: (text: string) => void
   stop: () => void
   isSpeaking: Ref<boolean>
+  isLoading: Ref<boolean>
   error: Ref<string | null>
 } {
   const isSpeaking = ref(false)
+  const isLoading = ref(false)
   const error = ref<string | null>(null)
   let synthesis: SpeechSynthesis | null = null
   let deVoice: SpeechSynthesisVoice | null = null
@@ -54,6 +60,7 @@ export function useSpeech(): {
       pendingText = null
       if (pendingTimeout !== null) window.clearTimeout(pendingTimeout)
       pendingTimeout = null
+      isLoading.value = false
       if (deVoice === null) {
         error.value = 'Keine lokale deutsche Stimme verfügbar. Bitte installiere eine deutsche Systemstimme.'
         return
@@ -63,12 +70,14 @@ export function useSpeech(): {
   }
 
   const stop = (): void => {
+    const shouldCancel = activeUtterance !== null
     activeUtterance = null
     isSpeaking.value = false
+    isLoading.value = false
     pendingText = null
     if (pendingTimeout !== null) window.clearTimeout(pendingTimeout)
     pendingTimeout = null
-    getSynthesis()?.cancel()
+    if (shouldCancel) getSynthesis()?.cancel()
   }
 
   const speak = (text: string): void => {
@@ -86,21 +95,27 @@ export function useSpeech(): {
     error.value = null
     if (deVoice === null && currentSynthesis.getVoices().length === 0) {
       pendingText = phrase
+      isLoading.value = true
       if (pendingTimeout !== null) window.clearTimeout(pendingTimeout)
       pendingTimeout = window.setTimeout(() => {
         pendingText = null
         pendingTimeout = null
+        isLoading.value = false
         error.value = 'Keine lokale deutsche Stimme geladen. Bitte installiere eine deutsche Systemstimme.'
       }, 5000)
       return
     }
     if (deVoice === null) throw new Error('Keine lokale deutsche Stimme verfügbar. Bitte installiere eine deutsche Systemstimme für die Offline-Vorlesefunktion.')
-    currentSynthesis.cancel()
+    pendingText = null
+    if (pendingTimeout !== null) window.clearTimeout(pendingTimeout)
+    pendingTimeout = null
+    isLoading.value = false
+    if (activeUtterance !== null || currentSynthesis.speaking || currentSynthesis.pending) currentSynthesis.cancel()
 
     const utterance = new SpeechSynthesisUtterance(phrase)
     utterance.lang = 'de-DE'
-    utterance.pitch = 1.05
-    utterance.rate = 0.9
+    utterance.pitch = 1
+    utterance.rate = 1
     utterance.voice = deVoice
 
     activeUtterance = utterance
@@ -140,11 +155,12 @@ export function useSpeech(): {
     if (pendingTimeout !== null) window.clearTimeout(pendingTimeout)
     if (synthesis) {
       synthesis.removeEventListener('voiceschanged', handleVoicesChanged)
-      synthesis.cancel()
+      if (activeUtterance !== null) synthesis.cancel()
     }
     activeUtterance = null
     isSpeaking.value = false
+    isLoading.value = false
   })
 
-  return { speak, stop, isSpeaking, error }
+  return { speak, stop, isSpeaking, isLoading, error }
 }

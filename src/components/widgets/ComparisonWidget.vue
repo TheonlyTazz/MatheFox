@@ -7,7 +7,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: '<' | '>' | '=']; speak:
 if (!Number.isInteger(props.left) || !Number.isInteger(props.right) || props.left < 0 || props.left > 20 || props.right < 0 || props.right > 20) throw new Error('Comparison quantities must be integers from 0 to 20')
 if (props.modelValue !== null && !['<', '>', '='].includes(props.modelValue)) throw new Error('Comparison selection must be <, >, =, or null')
 const correct = computed(() => props.left < props.right ? '<' : props.left > props.right ? '>' : '=')
-const choose = (value: '<' | '>' | '='): void => { if (props.disabled) return; emit('update:modelValue', value); emit('speak', value === '=' ? 'Gleich viel' : value === '<' ? 'Kleiner als' : 'Größer als'); if (value === correct.value) playBeep(880, .14) }
+const choose = (value: '<' | '>' | '='): void => { if (props.disabled) return; emit('update:modelValue', value); if (value === correct.value) playBeep(880, .14) }
 </script>
 
 <template>

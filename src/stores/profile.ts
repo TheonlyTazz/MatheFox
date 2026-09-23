@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { getGradeCatalog } from '../data/grades'
 import type { GradeLevel } from '../types/curriculum'
+import { setSoundEffectsEnabled as configureSoundEffects } from '../services/audio'
 
 export interface UserProfile {
   nickname: string
@@ -16,8 +17,10 @@ export interface UserProfile {
   lastPlayed: string
   catalogVersion?: 2
   autoReadQuestions: boolean
+  soundEffectsEnabled: boolean
+  audioPreferenceVersion?: 2
 }
-type StoredProfile = Omit<UserProfile, 'autoReadQuestions'> & { autoReadQuestions?: boolean }
+type StoredProfile = Omit<UserProfile, 'autoReadQuestions' | 'soundEffectsEnabled'> & { autoReadQuestions?: boolean; soundEffectsEnabled?: boolean }
 
 const STORAGE_KEY = 'mathefox-profile'
 const avatars = ['owl', 'fox', 'cat', 'robot', 'bear', 'dragon'] as const
@@ -35,7 +38,7 @@ const allTopicIds = (): string[] => grades.flatMap((grade) => topicsFor(grade))
 const defaultProfile = (): UserProfile => ({
   nickname: 'Mathe-Held', avatar: 'fox', currentGrade: 1,
   activeTopicIds: topicsFor(1), hasCompletedWizard: false,
-  dailyStreak: 0, xp: 0, unlockedBadgeIds: [], completedTopicIds: [], lastPlayed: '', catalogVersion: 2, autoReadQuestions: true,
+  dailyStreak: 0, xp: 0, unlockedBadgeIds: [], completedTopicIds: [], lastPlayed: '', catalogVersion: 2, autoReadQuestions: false, soundEffectsEnabled: false, audioPreferenceVersion: 2,
 })
 
 const isGrade = (value: unknown): value is GradeLevel => grades.includes(value as GradeLevel)
@@ -56,6 +59,8 @@ const isProfile = (value: unknown): value is StoredProfile => {
     && typeof candidate.lastPlayed === 'string'
     && (candidate.catalogVersion === undefined || candidate.catalogVersion === 2)
     && (candidate.autoReadQuestions === undefined || typeof candidate.autoReadQuestions === 'boolean')
+    && (candidate.soundEffectsEnabled === undefined || typeof candidate.soundEffectsEnabled === 'boolean')
+    && (candidate.audioPreferenceVersion === undefined || candidate.audioPreferenceVersion === 2)
 }
 
 const loadProfile = (): UserProfile => {
@@ -68,14 +73,16 @@ const loadProfile = (): UserProfile => {
     const validTopics = topicsFor(parsed.currentGrade)
     if (parsed.activeTopicIds.some((topicId) => !validTopics.includes(topicId))) throw new Error('Invalid topic selection')
     if (parsed.completedTopicIds.some((topicId) => !allTopicIds().includes(topicId))) throw new Error('Invalid completed topic')
-    if (parsed.catalogVersion === 2 && parsed.autoReadQuestions !== undefined) return { ...parsed, autoReadQuestions: parsed.autoReadQuestions }
+    if (parsed.catalogVersion === 2 && parsed.audioPreferenceVersion === 2 && parsed.autoReadQuestions !== undefined && parsed.soundEffectsEnabled !== undefined) return { ...parsed, autoReadQuestions: parsed.autoReadQuestions, soundEffectsEnabled: parsed.soundEffectsEnabled }
     const oldTopics = previousTopicIds[parsed.currentGrade]
     const hadAllOldTopics = parsed.catalogVersion !== 2 && parsed.activeTopicIds.length === oldTopics.length && oldTopics.every((topicId) => parsed.activeTopicIds.includes(topicId))
     const migrated: UserProfile = {
       ...parsed,
       activeTopicIds: hadAllOldTopics ? validTopics : parsed.activeTopicIds,
       catalogVersion: 2,
-      autoReadQuestions: parsed.autoReadQuestions === undefined ? parsed.currentGrade === 1 : parsed.autoReadQuestions,
+      autoReadQuestions: parsed.audioPreferenceVersion === 2 ? parsed.autoReadQuestions === true : false,
+      soundEffectsEnabled: parsed.audioPreferenceVersion === 2 ? parsed.soundEffectsEnabled === true : false,
+      audioPreferenceVersion: 2,
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
     return migrated
@@ -97,6 +104,8 @@ export const useProfileStore = defineStore('profile', () => {
   const completedTopicIds = ref<string[]>([...saved.completedTopicIds])
   const lastPlayed = ref(saved.lastPlayed)
   const autoReadQuestions = ref(saved.autoReadQuestions)
+  const soundEffectsEnabled = ref(saved.soundEffectsEnabled)
+  configureSoundEffects(soundEffectsEnabled.value)
   const availableTopics = computed(() => getGradeCatalog(currentGrade.value).topics)
 
   const persist = (): void => {
@@ -105,7 +114,7 @@ export const useProfileStore = defineStore('profile', () => {
     activeTopicIds: activeTopicIds.value, hasCompletedWizard: hasCompletedWizard.value,
     dailyStreak: dailyStreak.value, xp: xp.value, unlockedBadgeIds: unlockedBadgeIds.value,
     completedTopicIds: completedTopicIds.value,
-    lastPlayed: lastPlayed.value, catalogVersion: 2, autoReadQuestions: autoReadQuestions.value,
+    lastPlayed: lastPlayed.value, catalogVersion: 2, autoReadQuestions: autoReadQuestions.value, soundEffectsEnabled: soundEffectsEnabled.value, audioPreferenceVersion: 2,
     } satisfies UserProfile
     if (!isProfile(snapshot)) throw new Error('Profile mutation produced an invalid state')
     const validActiveTopics = topicsFor(snapshot.currentGrade)
@@ -113,8 +122,8 @@ export const useProfileStore = defineStore('profile', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
   }
   watch(
-    [nickname, avatar, currentGrade, activeTopicIds, hasCompletedWizard, dailyStreak, xp, unlockedBadgeIds, completedTopicIds, lastPlayed, autoReadQuestions],
-    persist,
+    [nickname, avatar, currentGrade, activeTopicIds, hasCompletedWizard, dailyStreak, xp, unlockedBadgeIds, completedTopicIds, lastPlayed, autoReadQuestions, soundEffectsEnabled],
+    () => { configureSoundEffects(soundEffectsEnabled.value); persist() },
     { deep: true },
   )
 
@@ -156,6 +165,12 @@ export const useProfileStore = defineStore('profile', () => {
     autoReadQuestions.value = enabled
     persist()
   }
+  const setSoundEffectsEnabled = (enabled: boolean): void => {
+    if (typeof enabled !== 'boolean') throw new Error('Sound effects preference must be a boolean')
+    soundEffectsEnabled.value = enabled
+    configureSoundEffects(enabled)
+    persist()
+  }
 
   const award = (topicId: string, points: number): void => {
     if (!Number.isInteger(points) || points < 0) throw new Error('Award points must be a non-negative integer')
@@ -181,7 +196,7 @@ export const useProfileStore = defineStore('profile', () => {
     persist()
   }
 
-  return { nickname, avatar, currentGrade, activeTopicIds, hasCompletedWizard, dailyStreak, xp, unlockedBadgeIds, completedTopicIds, lastPlayed, autoReadQuestions, availableTopics, completeWizard, switchGrade, toggleTopic, selectAllTopics, deselectAllTopics, setAutoReadQuestions, award, completeTopic }
+  return { nickname, avatar, currentGrade, activeTopicIds, hasCompletedWizard, dailyStreak, xp, unlockedBadgeIds, completedTopicIds, lastPlayed, autoReadQuestions, soundEffectsEnabled, availableTopics, completeWizard, switchGrade, toggleTopic, selectAllTopics, deselectAllTopics, setAutoReadQuestions, setSoundEffectsEnabled, award, completeTopic }
 })
 
 export type { GradeLevel }

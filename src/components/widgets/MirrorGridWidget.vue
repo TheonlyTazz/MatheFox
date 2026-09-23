@@ -6,7 +6,7 @@ const valid = (indices: readonly number[]): boolean => indices.every((index) => 
 if (!valid(props.filledIndices) || !valid(props.modelValue)) throw new Error('Mirror grid indices must be integers from 0 to 63')
 if (props.filledIndices.some((index) => index % 8 > 3)) throw new Error('Mirror source cells must be left of the mirror axis')
 const cells = computed(() => new Set(props.modelValue))
-const toggle = (index:number): void => { if (props.disabled || index % 8 < 4) return; const next = new Set(props.modelValue); next.has(index) ? next.delete(index) : next.add(index); emit('update:modelValue', [...next].sort((a,b) => a-b)); emit('speak', `Reihe ${Math.floor(index / 8) + 1}, Spalte ${index % 8 + 1}`) }
+const toggle = (index:number): void => { if (props.disabled || index % 8 < 4) return; const next = new Set(props.modelValue); next.has(index) ? next.delete(index) : next.add(index); emit('update:modelValue', [...next].sort((a,b) => a-b)) }
 </script>
 <template>
   <div class="mirror-wrap" aria-label="Spiegelwerkstatt"><div class="mirror-grid"><button v-for="index in 64" :key="index" type="button" class="mirror-cell" :class="{ source: filledIndices.includes(index - 1), filled: cells.has(index - 1), axis: (index - 1) % 8 === 3 }" :disabled="disabled || (index - 1) % 8 < 4" :aria-label="`Reihe ${Math.ceil(index / 8)}, Spalte ${((index - 1) % 8) + 1}`" @click="toggle(index - 1)" /></div><p class="mirror-caption">Spiegelachse zwischen Spalte 4 und 5</p></div>
