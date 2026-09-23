@@ -15,7 +15,9 @@ export interface UserProfile {
   completedTopicIds: string[]
   lastPlayed: string
   catalogVersion?: 2
+  autoReadQuestions: boolean
 }
+type StoredProfile = Omit<UserProfile, 'autoReadQuestions'> & { autoReadQuestions?: boolean }
 
 const STORAGE_KEY = 'mathefox-profile'
 const avatars = ['owl', 'fox', 'cat', 'robot', 'bear', 'dragon'] as const
@@ -33,13 +35,13 @@ const allTopicIds = (): string[] => grades.flatMap((grade) => topicsFor(grade))
 const defaultProfile = (): UserProfile => ({
   nickname: 'Mathe-Held', avatar: 'fox', currentGrade: 1,
   activeTopicIds: topicsFor(1), hasCompletedWizard: false,
-  dailyStreak: 0, xp: 0, unlockedBadgeIds: [], completedTopicIds: [], lastPlayed: '', catalogVersion: 2,
+  dailyStreak: 0, xp: 0, unlockedBadgeIds: [], completedTopicIds: [], lastPlayed: '', catalogVersion: 2, autoReadQuestions: true,
 })
 
 const isGrade = (value: unknown): value is GradeLevel => grades.includes(value as GradeLevel)
 const isStringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
 const hasUniqueItems = (items: readonly string[]): boolean => new Set(items).size === items.length
-const isProfile = (value: unknown): value is UserProfile => {
+const isProfile = (value: unknown): value is StoredProfile => {
   if (value === null || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>
   return typeof candidate.nickname === 'string' && candidate.nickname.trim().length > 0
@@ -53,6 +55,7 @@ const isProfile = (value: unknown): value is UserProfile => {
     && isStringArray(candidate.completedTopicIds) && hasUniqueItems(candidate.completedTopicIds)
     && typeof candidate.lastPlayed === 'string'
     && (candidate.catalogVersion === undefined || candidate.catalogVersion === 2)
+    && (candidate.autoReadQuestions === undefined || typeof candidate.autoReadQuestions === 'boolean')
 }
 
 const loadProfile = (): UserProfile => {
@@ -65,13 +68,14 @@ const loadProfile = (): UserProfile => {
     const validTopics = topicsFor(parsed.currentGrade)
     if (parsed.activeTopicIds.some((topicId) => !validTopics.includes(topicId))) throw new Error('Invalid topic selection')
     if (parsed.completedTopicIds.some((topicId) => !allTopicIds().includes(topicId))) throw new Error('Invalid completed topic')
-    if (parsed.catalogVersion === 2) return parsed
+    if (parsed.catalogVersion === 2 && parsed.autoReadQuestions !== undefined) return { ...parsed, autoReadQuestions: parsed.autoReadQuestions }
     const oldTopics = previousTopicIds[parsed.currentGrade]
-    const hadAllOldTopics = parsed.activeTopicIds.length === oldTopics.length && oldTopics.every((topicId) => parsed.activeTopicIds.includes(topicId))
+    const hadAllOldTopics = parsed.catalogVersion !== 2 && parsed.activeTopicIds.length === oldTopics.length && oldTopics.every((topicId) => parsed.activeTopicIds.includes(topicId))
     const migrated: UserProfile = {
       ...parsed,
       activeTopicIds: hadAllOldTopics ? validTopics : parsed.activeTopicIds,
       catalogVersion: 2,
+      autoReadQuestions: parsed.autoReadQuestions === undefined ? parsed.currentGrade === 1 : parsed.autoReadQuestions,
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
     return migrated
@@ -92,6 +96,7 @@ export const useProfileStore = defineStore('profile', () => {
   const unlockedBadgeIds = ref<string[]>([...saved.unlockedBadgeIds])
   const completedTopicIds = ref<string[]>([...saved.completedTopicIds])
   const lastPlayed = ref(saved.lastPlayed)
+  const autoReadQuestions = ref(saved.autoReadQuestions)
   const availableTopics = computed(() => getGradeCatalog(currentGrade.value).topics)
 
   const persist = (): void => {
@@ -100,7 +105,7 @@ export const useProfileStore = defineStore('profile', () => {
     activeTopicIds: activeTopicIds.value, hasCompletedWizard: hasCompletedWizard.value,
     dailyStreak: dailyStreak.value, xp: xp.value, unlockedBadgeIds: unlockedBadgeIds.value,
     completedTopicIds: completedTopicIds.value,
-    lastPlayed: lastPlayed.value, catalogVersion: 2,
+    lastPlayed: lastPlayed.value, catalogVersion: 2, autoReadQuestions: autoReadQuestions.value,
     } satisfies UserProfile
     if (!isProfile(snapshot)) throw new Error('Profile mutation produced an invalid state')
     const validActiveTopics = topicsFor(snapshot.currentGrade)
@@ -108,7 +113,7 @@ export const useProfileStore = defineStore('profile', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
   }
   watch(
-    [nickname, avatar, currentGrade, activeTopicIds, hasCompletedWizard, dailyStreak, xp, unlockedBadgeIds, completedTopicIds, lastPlayed],
+    [nickname, avatar, currentGrade, activeTopicIds, hasCompletedWizard, dailyStreak, xp, unlockedBadgeIds, completedTopicIds, lastPlayed, autoReadQuestions],
     persist,
     { deep: true },
   )
@@ -146,6 +151,11 @@ export const useProfileStore = defineStore('profile', () => {
 
   const selectAllTopics = (): void => { activeTopicIds.value = topicsFor(currentGrade.value); persist() }
   const deselectAllTopics = (): void => { activeTopicIds.value = []; persist() }
+  const setAutoReadQuestions = (enabled: boolean): void => {
+    if (typeof enabled !== 'boolean') throw new Error('Auto-read preference must be a boolean')
+    autoReadQuestions.value = enabled
+    persist()
+  }
 
   const award = (topicId: string, points: number): void => {
     if (!Number.isInteger(points) || points < 0) throw new Error('Award points must be a non-negative integer')
@@ -171,7 +181,7 @@ export const useProfileStore = defineStore('profile', () => {
     persist()
   }
 
-  return { nickname, avatar, currentGrade, activeTopicIds, hasCompletedWizard, dailyStreak, xp, unlockedBadgeIds, completedTopicIds, lastPlayed, availableTopics, completeWizard, switchGrade, toggleTopic, selectAllTopics, deselectAllTopics, award, completeTopic }
+  return { nickname, avatar, currentGrade, activeTopicIds, hasCompletedWizard, dailyStreak, xp, unlockedBadgeIds, completedTopicIds, lastPlayed, autoReadQuestions, availableTopics, completeWizard, switchGrade, toggleTopic, selectAllTopics, deselectAllTopics, setAutoReadQuestions, award, completeTopic }
 })
 
 export type { GradeLevel }

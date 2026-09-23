@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { ExerciseVisual } from '../types/curriculum'
+import TenTwentyFrameWidget from './widgets/TenTwentyFrameWidget.vue'
+import CoinWalletWidget from './widgets/CoinWalletWidget.vue'
+import MultiplicationArrayWidget from './widgets/MultiplicationArrayWidget.vue'
+import FrogNumberLineWidget from './widgets/FrogNumberLineWidget.vue'
 
 const props = withDefaults(defineProps<{ visual: ExerciseVisual; disabled?: boolean }>(), { disabled: false })
+const emit = defineEmits<{ answer: [value: number] }>()
 const selectedSector = ref<number | null>(null)
 const spinCount = ref(0)
+const frogValue = ref(props.visual.kind === 'frog-number-line' ? props.visual.start : 0)
 
 const validate = (visual: ExerciseVisual): void => {
   if (visual.kind === 'tokens' && visual.tokens.length === 0) throw new Error('Token visual must contain at least one token')
@@ -14,6 +20,9 @@ const validate = (visual: ExerciseVisual): void => {
   if (visual.kind === 'grid-shape' && (!Number.isInteger(visual.columns) || visual.columns < 1 || visual.cells.length === 0 || visual.cells.length % visual.columns !== 0)) throw new Error('Grid visual must have positive columns and a complete grid')
   if (visual.kind === 'combinations' && (visual.groups.length < 2 || visual.groups.some((group) => group.options.length === 0))) throw new Error('Combination visual must contain at least two non-empty groups')
   if (visual.kind === 'combinations' && visual.layout === 'tree' && visual.groups.length !== 2) throw new Error('Tree diagram must have exactly two levels')
+  if (visual.kind === 'ten-frame' && ((visual.capacity !== 10 && visual.capacity !== 20) || !Number.isInteger(visual.redCount) || visual.redCount < 0 || visual.redCount > visual.capacity)) throw new Error('Ten frame visual has invalid capacity or red count')
+  if (visual.kind === 'multiplication-array' && (![visual.rows, visual.columns].every((value) => Number.isInteger(value) && value >= 1 && value <= 10))) throw new Error('Multiplication array dimensions must be between 1 and 10')
+  if (visual.kind === 'frog-number-line' && (![visual.start, visual.target].every((value) => Number.isInteger(value) && value >= 0 && value <= 100))) throw new Error('Frog number line values must be between 0 and 100')
 }
 validate(props.visual)
 
@@ -33,6 +42,10 @@ const spinWheel = (): void => {
   selectedSector.value = Math.floor(Math.random() * props.visual.sectors.length)
   spinCount.value += 1
 }
+const updateFrog = (value: number): void => {
+  frogValue.value = value
+  emit('answer', value)
+}
 </script>
 
 <template>
@@ -45,6 +58,10 @@ const spinWheel = (): void => {
     <div v-else-if="visual.kind === 'grid-shape'" class="mx-auto grid max-w-xs gap-1" :style="{ gridTemplateColumns: `repeat(${visual.columns}, minmax(0, 1fr))` }"><span v-for="(filled, index) in visual.cells" :key="index" class="aspect-square rounded border" :class="filled ? 'border-violet-500 bg-violet-400' : 'border-stone-200 bg-white'" /></div>
     <div v-else-if="visual.kind === 'combinations' && visual.layout === 'tree'" class="flex flex-col items-center gap-2"><strong class="rounded-lg bg-orange-200 px-3 py-1">Start</strong><div class="flex w-full justify-around gap-2 border-t-2 border-orange-300 pt-2"><div v-for="option in visual.groups[0].options" :key="option" class="flex flex-col items-center gap-1"><strong class="rounded-lg bg-white px-2 py-1 text-sm">{{ option }}</strong><span v-for="branch in visual.groups[1].options" :key="branch" class="rounded-lg border-l-2 border-orange-300 bg-orange-100 px-2 py-1 text-xs">↳ {{ branch }}</span></div></div></div>
     <div v-else-if="visual.kind === 'combinations'" class="flex flex-wrap items-center justify-center gap-2"><template v-for="(group, groupIndex) in visual.groups" :key="group.label"><div class="rounded-xl bg-white p-2 text-center"><strong class="block text-xs text-stone-600">{{ group.label }}</strong><span v-for="option in group.options" :key="option" class="mx-1 inline-block rounded bg-orange-100 px-2 py-1 text-sm font-bold">{{ option }}</span></div><span v-if="groupIndex < visual.groups.length - 1" class="text-xl font-bold text-orange-600">×</span></template></div>
+    <TenTwentyFrameWidget v-else-if="visual.kind === 'ten-frame'" :capacity="visual.capacity" :red-count="visual.redCount" :disabled="disabled" @change="emit('answer', $event)" />
+    <CoinWalletWidget v-else-if="visual.kind === 'coin-wallet'" :disabled="disabled" @change="emit('answer', $event)" />
+    <MultiplicationArrayWidget v-else-if="visual.kind === 'multiplication-array'" :initial-rows="visual.rows" :initial-columns="visual.columns" :disabled="disabled" @change="emit('answer', $event)" />
+    <FrogNumberLineWidget v-else-if="visual.kind === 'frog-number-line'" :model-value="frogValue" :start="visual.start" :target="visual.target" :disabled="disabled" @update:model-value="updateFrog" />
   </section>
 </template>
 

@@ -11,6 +11,8 @@ export type ExerciseType =
   | 'spatial-grid'
   | 'number-wall'
   | 'symmetry-grid'
+  | 'comparison'
+  | 'mirror-grid'
 
 export type ExerciseVisual =
   | { kind: 'tokens'; tokens: readonly string[] }
@@ -19,6 +21,10 @@ export type ExerciseVisual =
   | { kind: 'bars'; orientation?: 'horizontal' | 'vertical'; bars: readonly { label: string; value: number; color: string }[] }
   | { kind: 'grid-shape'; columns: number; cells: readonly boolean[] }
   | { kind: 'combinations'; layout?: 'tree'; groups: readonly { label: string; options: readonly string[] }[] }
+  | { kind: 'ten-frame'; capacity: 10 | 20; redCount: number }
+  | { kind: 'coin-wallet' }
+  | { kind: 'multiplication-array'; rows: number; columns: number }
+  | { kind: 'frog-number-line'; start: number; target: number }
 
 export interface NumberInputData { answer: number; unit?: string }
 export interface MultipleChoiceData { options: readonly string[]; answer: string }
@@ -30,6 +36,8 @@ export interface ShapeDetectiveData { shape: 'circle' | 'triangle' | 'square' | 
 export interface SpatialGridData { reference: string; referenceIndex: number; secondaryReferenceIndex?: number; answerIndex: number; columns: number; rows: number }
 export interface NumberWallData { rows: readonly (readonly (number | null)[])[]; answers: readonly number[] }
 export interface SymmetryGridData { columns: number; rows: number; axisAfterColumn: number; filledIndices: readonly number[]; answerIndices: readonly number[] }
+export interface ComparisonData { left: number; right: number; answer: '<' | '>' | '=' }
+export interface MirrorGridData { filledIndices: readonly number[]; answerIndices: readonly number[] }
 
 export interface ExerciseBase<T extends ExerciseType, D> {
   id: string
@@ -57,6 +65,8 @@ export type Exercise =
   | ExerciseBase<'spatial-grid', SpatialGridData>
   | ExerciseBase<'number-wall', NumberWallData>
   | ExerciseBase<'symmetry-grid', SymmetryGridData>
+  | ExerciseBase<'comparison', ComparisonData>
+  | ExerciseBase<'mirror-grid', MirrorGridData>
 
 export type ExerciseAnswer = number | string | readonly number[] | readonly string[] | Readonly<Record<string, string | number>>
 export type ExerciseFactory = (seed?: number) => Exercise

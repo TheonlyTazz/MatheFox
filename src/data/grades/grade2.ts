@@ -11,10 +11,10 @@ const topics = [
   topic(grade, 'g2_zahlenraum_100', 'Zahlenraum bis 100', 'Zehner, Einer und Ausschnitte der Hundertertafel.', '💯', [
     factory((s) => { const n = randomInt(s, 10, 99); return numberExercise(grade, 'g2_zahlenraum_100', 'Zehner und Einer', `Wie viele Zehner hat ${n}?`, Math.floor(n / 10), s) }),
     factory((s) => { const n = randomInt(s, 10, 99); return numberExercise(grade, 'g2_zahlenraum_100', 'Einer bestimmen', `Wie viele Einer hat ${n}?`, n % 10, s) }),
-    factory((s) => { const n = randomInt(s, 11, 89); return numberExercise(grade, 'g2_zahlenraum_100', 'Hundertertafel', `Welche Zahl steht eine Zeile darunter: ${n}?`, n + 10, s) }),
+    factory((s) => { const n = randomInt(s, 11, 89); return { ...numberExercise(grade, 'g2_zahlenraum_100', 'Hundertertafel', `Welche Zahl steht eine Zeile darunter: ${n}?`, n + 10, s), visual: { kind: 'frog-number-line' as const, start: n, target: n + 10 } } }),
   ]),
   topic(grade, 'g2_einmaleins', 'Kleines Einmaleins', '2er, 3er, 4er, 5er und 10er Reihen sowie Tauschaufgaben.', '✖️', [
-    factory((s) => { const a = pick([2, 3, 4, 5, 10] as const, randomInt(s, 0, 4)); const b = randomInt(s + 1, 1, 10); return numberExercise(grade, 'g2_einmaleins', 'Mal-Reihe', `Rechne: ${a} · ${b}`, a * b, s) }),
+    factory((s) => { const a = pick([2, 3, 4, 5, 10] as const, randomInt(s, 0, 4)); const b = randomInt(s + 1, 1, 10); return { ...numberExercise(grade, 'g2_einmaleins', 'Mal-Reihe', `Rechne: ${a} · ${b}`, a * b, s), visual: { kind: 'multiplication-array' as const, rows: a, columns: b } } }),
     factory((s) => { const a = randomInt(s, 6, 10); const b = randomInt(s + 1, 2, 5); return choiceExercise(grade, 'g2_einmaleins', 'Tauschaufgabe', `Welche Malaufgabe vertauscht die Faktoren von ${a} · ${b}?`, [`${b} · ${a}`, `${a} + ${b}`, `${a} · ${b + 1}`], `${b} · ${a}`, s) }),
   ]),
   topic(grade, 'g2_halbschriftlich', 'Halbschriftlich rechnen', 'Plus und Minus mit Zehnerübergang bis 100.', '🧮', [
@@ -30,6 +30,7 @@ const topics = [
   topic(grade, 'g2_geometrie_symmetrie', 'Symmetrie und Körper', 'Symmetrieachsen, Würfel und Kugel erkennen.', '⬛', [
     factory((s) => choiceExercise(grade, 'g2_geometrie_symmetrie', 'Symmetrie-Detektiv', 'Wie viele Symmetrieachsen hat ein Quadrat?', ['1', '2', '4'], '4', s)),
     factory((s) => choiceExercise(grade, 'g2_geometrie_symmetrie', 'Körper-Detektiv', 'Welcher Körper ist rund?', ['Würfel', 'Kugel', 'Quader'], 'Kugel', s)),
+    factory((s) => { const filledIndices = [0, 1, 8, 9, 16]; const answerIndices = [6, 7, 14, 15, 23]; return { id: `g2_geometrie_symmetrie-mirror-${s}`, topicId: 'g2_geometrie_symmetrie', grade, title: 'Spiegel-Werkstatt', instruction: 'Ergänze rechts der Spiegelachse genau die gespiegelten Kästchen.', type: 'mirror-grid' as const, data: { filledIndices, answerIndices }, xpReward: 12, validate: (value: ExerciseAnswer) => Array.isArray(value) && value.length === answerIndices.length && [...value].sort((a, b) => Number(a) - Number(b)).every((item, index) => item === answerIndices[index]) } }),
   ]),
   topic(grade, 'g2_rechenvorteile', 'Rechenvorteile', 'Nachbaraufgaben sowie Tausch- und Umkehraufgaben geschickt nutzen.', '🧠', [
     factory((s) => { const a = randomInt(s, 2, 8); const b = randomInt(s + 1, 2, 9); const neighbor = a * (b - 1); return numberExercise(grade, 'g2_rechenvorteile', 'Nachbaraufgabe', `Die Nachbaraufgabe ${a} · ${b - 1} = ${neighbor} hilft. Wie viel ist ${a} · ${b}?`, a * b, s) }),
